@@ -10,55 +10,136 @@ class P2PManager {
         this.connectionAttempts = 0;
         this.maxConnectionAttempts = 3;
         
-        // PeerJS設定 - 無料のPeerJSサーバーを使用
+        // PeerJS設定 - 複数のサーバーオプション
         this.peerConfig = {
-            host: 'peerjs-server.herokuapp.com',
-            port: 443,
-            path: '/peerjs',
-            secure: true,
+            // デフォルトは公式PeerJSクラウドサーバーを使用
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
                 ]
-            }
+            },
+            debug: 2 // デバッグレベルを設定
         };
+        
+        // フォールバック用の設定
+        this.fallbackConfigs = [
+            // 公式クラウドサーバー（デフォルト）
+            {
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                },
+                debug: 1
+            },
+            // 別のSTUNサーバー設定
+            {
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.cloudflare.com:3478' },
+                        { urls: 'stun:stun.nextcloud.com:443' }
+                    ]
+                },
+                debug: 1
+            }
+        ];
     }
     
     // ホストとしてピアを作成
     async createHost() {
+        return this.createPeerWithFallback(true);
+    }
+    
+    // フォールバック機能付きピア作成
+    async createPeerWithFallback(isHost = false, targetPeerId = null) {
+        const configs = [this.peerConfig, ...this.fallbackConfigs];
+        
+        for (let i = 0; i < configs.length; i++) {
+            try {
+                console.log(`Attempting connection with config ${i + 1}/${configs.length}`);
+                
+                const result = await this.tryCreatePeer(configs[i], isHost, targetPeerId);
+                if (result) {
+                    console.log('Successfully connected with config:', i + 1);
+                    return result;
+                }
+                
+            } catch (error) {
+                console.warn(`Config ${i + 1} failed:`, error.message);
+                
+                // 最後の設定でも失敗した場合はエラーを投げる
+                if (i === configs.length - 1) {
+                    throw new Error(`すべての接続設定で失敗しました。最後のエラー: ${error.message}`);
+                }
+                
+                // 次の設定を試す前に少し待つ
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    }
+    
+    // 実際のピア作成を試行
+    async tryCreatePeer(config, isHost, targetPeerId = null) {
         try {
-            console.log('Creating host peer...');
+            let peer;
             
-            // カスタムピアIDを生成（より識別しやすい形式）
-            const customPeerId = this.generatePeerId();
-            
-            this.peer = new Peer(customPeerId, this.peerConfig);
-            this.isHost = true;
+            if (isHost) {
+                // ホストの場合：カスタムIDを生成
+                const customPeerId = this.generatePeerId();
+                peer = new Peer(customPeerId, config);
+                this.isHost = true;
+            } else {
+                // クライアントの場合：ランダムIDを使用
+                peer = new Peer(config);
+                this.isHost = false;
+            }
             
             return new Promise((resolve, reject) => {
-                this.peer.on('open', (id) => {
+                let resolved = false;
+                
+                peer.on('open', (id) => {
+                    if (resolved) return;
+                    resolved = true;
+                    
                     console.log('Peer opened with ID:', id);
+                    this.peer = peer;
                     this.peerId = id;
-                    this.setupHostListeners();
-                    resolve(id);
+                    
+                    if (isHost) {
+                        this.setupHostListeners();
+                        resolve(id);
+                    } else {
+                        // クライアントの場合は接続を開始
+                        this.initiateConnection(targetPeerId).then(() => {
+                            resolve(true);
+                        }).catch(reject);
+                    }
                 });
                 
-                this.peer.on('error', (error) => {
+                peer.on('error', (error) => {
+                    if (resolved) return;
+                    resolved = true;
+                    
                     console.error('Peer creation error:', error);
+                    peer.destroy();
                     reject(error);
                 });
                 
                 // タイムアウト処理
                 setTimeout(() => {
-                    if (!this.peerId) {
+                    if (!resolved) {
+                        resolved = true;
+                        peer.destroy();
                         reject(new Error('Peer creation timeout'));
                     }
-                }, 10000);
+                }, 8000);
             });
             
         } catch (error) {
-            console.error('Failed to create host:', error);
+            console.error('Failed to create peer:', error);
             throw error;
         }
     }
@@ -72,56 +153,54 @@ class P2PManager {
                 throw new Error('無効なピアIDです');
             }
             
-            // 自分用のピアを作成
-            this.peer = new Peer(this.peerConfig);
-            this.isHost = false;
-            
-            return new Promise((resolve, reject) => {
-                this.peer.on('open', (id) => {
-                    console.log('Client peer opened with ID:', id);
-                    this.peerId = id;
-                    
-                    // ターゲットピアに接続
-                    this.connection = this.peer.connect(targetPeerId, {
-                        reliable: true,
-                        metadata: {
-                            type: 'commU_connection',
-                            timestamp: Date.now()
-                        }
-                    });
-                    
-                    this.setupConnectionListeners(this.connection);
-                    
-                    // 接続完了を待つ
-                    this.connection.on('open', () => {
-                        console.log('Connection established to:', targetPeerId);
-                        if (this.onConnectionChange) {
-                            this.onConnectionChange('connected');
-                        }
-                        resolve(true);
-                    });
-                });
-                
-                this.peer.on('error', (error) => {
-                    console.error('Connection error:', error);
-                    if (this.onConnectionChange) {
-                        this.onConnectionChange('failed');
-                    }
-                    reject(error);
-                });
-                
-                // タイムアウト処理
-                setTimeout(() => {
-                    if (!this.connection || !this.connection.open) {
-                        reject(new Error('接続がタイムアウトしました'));
-                    }
-                }, 15000);
-            });
+            return this.createPeerWithFallback(false, targetPeerId);
             
         } catch (error) {
             console.error('Failed to connect to peer:', error);
             throw error;
         }
+    }
+    
+    // 実際の接続を開始
+    async initiateConnection(targetPeerId) {
+        return new Promise((resolve, reject) => {
+            // ターゲットピアに接続
+            this.connection = this.peer.connect(targetPeerId, {
+                reliable: true,
+                metadata: {
+                    type: 'commU_connection',
+                    timestamp: Date.now()
+                }
+            });
+            
+            if (!this.connection) {
+                reject(new Error('接続の作成に失敗しました'));
+                return;
+            }
+            
+            this.setupConnectionListeners(this.connection);
+            
+            // 接続完了を待つ
+            this.connection.on('open', () => {
+                console.log('Connection established to:', targetPeerId);
+                if (this.onConnectionChange) {
+                    this.onConnectionChange('connected');
+                }
+                resolve(true);
+            });
+            
+            this.connection.on('error', (error) => {
+                console.error('Connection error:', error);
+                reject(error);
+            });
+            
+            // タイムアウト処理
+            setTimeout(() => {
+                if (!this.connection || !this.connection.open) {
+                    reject(new Error('接続がタイムアウトしました'));
+                }
+            }, 10000);
+        });
     }
     
     // ホスト側のイベントリスナー設定
@@ -249,47 +328,53 @@ class P2PManager {
         console.error('Handling peer error:', error);
         
         let errorMessage = 'P2P接続エラーが発生しました';
+        let suggestions = '';
         
         switch (error.type) {
             case 'browser-incompatible':
                 errorMessage = 'お使いのブラウザはWebRTCをサポートしていません';
+                suggestions = 'Chrome、Firefox、Safari、Edgeの最新版をお使いください。';
                 break;
             case 'disconnected':
-                errorMessage = 'シグナリングサーバーから切断されました';
+            case 'server-error':
+            case 'socket-error':
+            case 'socket-closed':
+                errorMessage = 'シグナリングサーバーとの接続に問題があります';
+                suggestions = 'インターネット接続を確認して再試行してください。';
                 break;
             case 'invalid-id':
                 errorMessage = '無効なピアIDです';
+                suggestions = 'ピアIDの形式を確認してください（例：swift-tiger-123）。';
                 break;
             case 'invalid-key':
                 errorMessage = 'PeerJSキーが無効です';
+                suggestions = 'アプリを再読み込みして再試行してください。';
                 break;
             case 'network':
                 errorMessage = 'ネットワークエラーが発生しました';
+                suggestions = 'ネットワーク接続を確認し、ファイアウォール設定をチェックしてください。';
                 break;
             case 'peer-unavailable':
                 errorMessage = '指定されたピアが見つかりません';
+                suggestions = 'ピアIDが正しいか、相手が接続待機状態かを確認してください。';
                 break;
             case 'ssl-unavailable':
                 errorMessage = 'SSL接続が利用できません';
-                break;
-            case 'server-error':
-                errorMessage = 'サーバーエラーが発生しました';
-                break;
-            case 'socket-error':
-                errorMessage = 'ソケット接続エラーが発生しました';
-                break;
-            case 'socket-closed':
-                errorMessage = 'ソケット接続が閉じられました';
+                suggestions = 'HTTPSサイトでアクセスしていることを確認してください。';
                 break;
             case 'unavailable-id':
                 errorMessage = 'このピアIDは既に使用されています';
+                suggestions = '新しいピアIDを生成し直してください。';
                 break;
             default:
                 errorMessage = `接続エラー: ${error.message || error.type}`;
+                suggestions = 'ページを再読み込みして再試行してください。';
         }
         
+        const fullMessage = suggestions ? `${errorMessage}\n\n${suggestions}` : errorMessage;
+        
         if (this.onConnectionChange) {
-            this.onConnectionChange('error', errorMessage);
+            this.onConnectionChange('error', fullMessage);
         }
     }
     
