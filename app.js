@@ -23,17 +23,50 @@ class CommUApp {
         this.reconnectAttempts = 0; // 再接続試行回数
         this.maxReconnectAttempts = 3; // 最大再接続試行回数
         this.debugMode = false; // デバッグモード
-        this.connectionMethod = null; // 'bluetooth' または 'webrtc'
-        this.webrtcManager = null; // WebRTC接続管理
-        this.qrGenerator = null; // QRコード生成
-        this.qrScanner = null; // QRコードスキャナー
+        this.connectionMethod = null; // 'bluetooth' または 'p2p'
+        this.p2pManager = null; // P2P接続管理
+        this.peerDiscovery = null; // ピア検索機能
         
         this.init();
     }
 
     init() {
         this.setupEventListeners();
-        this.showScreen('bluetooth-screen');
+        this.setupBroadcastChannel();
+        this.showScreen('connection-screen');
+    }
+    
+    setupBroadcastChannel() {
+        // BroadcastChannelでの通信を監視
+        if (typeof BroadcastChannel !== 'undefined') {
+            try {
+                const channel = new BroadcastChannel('commu_webrtc');
+                channel.onmessage = (event) => {
+                    this.handleBroadcastMessage(event.data);
+                };
+                this.broadcastChannel = channel;
+                this.showDebugLog('info', 'BroadcastChannel setup completed');
+            } catch (error) {
+                this.showDebugLog('warn', 'BroadcastChannel setup failed:', error);
+            }
+        }
+    }
+    
+    handleBroadcastMessage(data) {
+        this.showDebugLog('info', 'Received broadcast message:', data);
+        
+        if (data.type === 'request_offer' && this.webrtcManager) {
+            // 他のタブから接続ID要求を受信した場合、自分が持っているオファーを送信
+            const offer = this.webrtcManager.getOfferFromLocalStorage(data.connectionId);
+            if (offer && this.broadcastChannel) {
+                this.broadcastChannel.postMessage({
+                    type: 'webrtc_offer',
+                    connectionId: data.connectionId,
+                    offer: offer
+                });
+                this.showDebugLog('info', 'Sent offer via broadcast for:', data.connectionId);
+            }
+        }
     }
 
     setupEventListeners() {
@@ -83,17 +116,15 @@ class CommUApp {
         document.getElementById('skip-export').addEventListener('click', () => this.skipExport());
 
         // 接続方法選択
-        document.getElementById('qr-connection').addEventListener('click', () => this.selectConnectionMethod('webrtc'));
+        document.getElementById('p2p-connection').addEventListener('click', () => this.selectConnectionMethod('p2p'));
         document.getElementById('bluetooth-connection').addEventListener('click', () => this.selectConnectionMethod('bluetooth'));
         document.getElementById('back-to-connection').addEventListener('click', () => this.showScreen('connection-screen'));
 
-        // QRコード接続
-        document.getElementById('qr-host-btn').addEventListener('click', () => this.startQRHost());
-        document.getElementById('qr-scan-btn').addEventListener('click', () => this.startQRScan());
-        document.getElementById('back-from-qr').addEventListener('click', () => this.showScreen('connection-screen'));
-        document.getElementById('toggle-camera').addEventListener('click', () => this.toggleCamera());
-        document.getElementById('manual-input-btn').addEventListener('click', () => this.toggleManualInput());
-        document.getElementById('manual-connect-btn').addEventListener('click', () => this.connectManually());
+        // P2P接続
+        document.getElementById('p2p-host-btn').addEventListener('click', () => this.startP2PHost());
+        document.getElementById('p2p-connect-btn').addEventListener('click', () => this.showP2PConnect());
+        document.getElementById('back-from-p2p').addEventListener('click', () => this.showScreen('connection-screen'));
+        document.getElementById('connect-peer-btn').addEventListener('click', () => this.connectToPeer());
 
         // デバッグ機能（隠しコマンド：タイトルを5回タップ）
         let tapCount = 0;
@@ -1020,188 +1051,167 @@ class CommUApp {
         
         if (method === 'bluetooth') {
             this.showScreen('bluetooth-screen');
-        } else if (method === 'webrtc') {
-            this.showScreen('qr-screen');
+        } else if (method === 'p2p') {
+            this.showScreen('p2p-screen');
         }
     }
 
-    // QRコードホスト開始
-    async startQRHost() {
+    // P2Pホスト開始
+    async startP2PHost() {
         try {
-            this.showDebugLog('info', 'QRコードホストを開始');
+            this.showDebugLog('info', 'P2Pホストを開始');
             
-            if (!this.webrtcManager) {
-                this.webrtcManager = new WebRTCManager();
-                this.webrtcManager.onMessage = (message) => this.processMessage(message);
-                this.webrtcManager.onConnectionChange = (state) => this.handleWebRTCConnectionChange(state);
+            if (!this.p2pManager) {
+                this.p2pManager = new P2PManager();
+                this.p2pManager.onMessage = (message) => this.processMessage(message);
+                this.p2pManager.onConnectionChange = (state, error) => this.handleP2PConnectionChange(state, error);
             }
             
-            const connectionId = await this.webrtcManager.createHost();
+            const peerId = await this.p2pManager.createHost();
             
-            // QRコードを生成
-            const canvas = document.getElementById('qr-canvas');
-            if (!this.qrGenerator) {
-                this.qrGenerator = new QRCodeGenerator(canvas);
-            }
-            this.qrGenerator.generate(connectionId);
+            // ピアIDを表示
+            document.getElementById('peer-id').textContent = peerId;
             
-            // 接続IDを表示
-            document.getElementById('connection-id').textContent = connectionId;
-            
-            // デバッグ情報として接続IDとオファー情報を表示
-            this.showDebugLog('info', `ホスト接続ID生成: ${connectionId}`);
-            this.showDebugLog('info', 'LocalStorage keys after host creation:', Object.keys(localStorage));
-            
-            // 接続IDが確実に保存されているかチェック
-            setTimeout(() => {
-                const storedOffer = localStorage.getItem(`offer_${connectionId}`);
-                if (storedOffer) {
-                    this.showDebugLog('info', 'オファーが正常に保存されました');
-                } else {
-                    this.showDebugLog('error', 'オファーの保存に失敗しました');
-                }
-            }, 1000);
+            // デバッグ情報
+            this.showDebugLog('info', `ホストピアID生成: ${peerId}`);
+            this.showDebugLog('info', 'P2P接続待機中...');
             
             // ホスト画面を表示
-            document.getElementById('qr-role-selection').classList.add('hidden');
-            document.getElementById('qr-host-section').classList.remove('hidden');
+            document.getElementById('p2p-role-selection').classList.add('hidden');
+            document.getElementById('p2p-host-section').classList.remove('hidden');
             
-            this.showMessage(`接続ID: ${connectionId}`);
+            // ピア検索を開始
+            if (!this.peerDiscovery) {
+                this.peerDiscovery = new PeerDiscovery(this.p2pManager);
+                this.peerDiscovery.onPeerDiscovered = (discoveredPeerId) => {
+                    this.showDebugLog('info', `ピア発見: ${discoveredPeerId}`);
+                };
+            }
+            this.peerDiscovery.startDiscovery();
+            
+            this.showMessage(`ピアID: ${peerId}\n他のデバイスからの接続を待っています`);
             
         } catch (error) {
-            this.showDebugLog('error', 'QRコードホスト開始失敗', error);
+            this.showDebugLog('error', 'P2Pホスト開始失敗', error);
             this.showMessage(`接続に失敗しました: ${error.message}`);
         }
     }
 
-    // QRコードスキャン開始
-    async startQRScan() {
-        try {
-            this.showDebugLog('info', 'QRコードスキャンを開始');
-            
-            const video = document.getElementById('camera-video');
-            if (!this.qrScanner) {
-                this.qrScanner = new QRCodeScanner(video);
-            }
-            
-            const cameraStarted = await this.qrScanner.startCamera();
-            if (!cameraStarted) {
-                throw new Error('カメラにアクセスできません');
-            }
-            
-            // スキャン画面を表示
-            document.getElementById('qr-role-selection').classList.add('hidden');
-            document.getElementById('qr-client-section').classList.remove('hidden');
-            
-            // QRコードスキャンを開始
-            this.qrScanner.startScanning((connectionId) => {
-                this.connectToQRHost(connectionId);
-            });
-            
-        } catch (error) {
-            this.showDebugLog('error', 'QRコードスキャン開始失敗', error);
-            this.showMessage(`カメラエラー: ${error.message}`);
+    // P2P接続画面を表示
+    showP2PConnect() {
+        this.showDebugLog('info', 'P2P接続画面を表示');
+        
+        // 接続画面を表示
+        document.getElementById('p2p-role-selection').classList.add('hidden');
+        document.getElementById('p2p-client-section').classList.remove('hidden');
+        
+        // 入力フィールドにフォーカス
+        const peerIdInput = document.getElementById('peer-id-input');
+        if (peerIdInput) {
+            peerIdInput.focus();
         }
     }
 
-    // QRコードホストに接続
-    async connectToQRHost(connectionId) {
+    // ピアに接続
+    async connectToPeer() {
         try {
-            this.showDebugLog('info', `QRコードホストに接続: ${connectionId}`);
+            const peerIdInput = document.getElementById('peer-id-input');
+            const targetPeerId = peerIdInput.value.trim();
             
-            if (!this.webrtcManager) {
-                this.webrtcManager = new WebRTCManager();
-                this.webrtcManager.onMessage = (message) => this.processMessage(message);
-                this.webrtcManager.onConnectionChange = (state) => this.handleWebRTCConnectionChange(state);
+            if (!targetPeerId) {
+                this.showMessage('ピアIDを入力してください');
+                return;
             }
             
-            await this.webrtcManager.connectToHost(connectionId);
+            this.showDebugLog('info', `ピアに接続: ${targetPeerId}`);
             
-            // カメラを停止
-            if (this.qrScanner) {
-                this.qrScanner.stopCamera();
+            // ローディング状態を表示
+            const statusElement = document.getElementById('client-status');
+            if (statusElement) {
+                statusElement.textContent = '接続中...';
             }
             
-            document.getElementById('client-status').textContent = '接続しています...';
+            if (!this.p2pManager) {
+                this.p2pManager = new P2PManager();
+                this.p2pManager.onMessage = (message) => this.processMessage(message);
+                this.p2pManager.onConnectionChange = (state, error) => this.handleP2PConnectionChange(state, error);
+            }
+            
+            // ピアに接続
+            if (statusElement) {
+                statusElement.textContent = 'P2P接続を確立中...';
+            }
+            
+            await this.p2pManager.connectToPeer(targetPeerId);
+            
+            if (statusElement) {
+                statusElement.textContent = '接続完了';
+            }
+            
+            this.showDebugLog('info', '接続処理が完了しました');
+            
+            // 入力フィールドをクリア
+            peerIdInput.value = '';
             
         } catch (error) {
-            this.showDebugLog('error', 'QRコードホスト接続失敗', error);
+            this.showDebugLog('error', 'ピア接続失敗', error);
+            
+            // エラー状態を表示
+            const statusElement = document.getElementById('client-status');
+            if (statusElement) {
+                statusElement.textContent = '接続に失敗しました';
+            }
+            
             this.showMessage(`接続に失敗しました: ${error.message}`);
         }
     }
 
-    // WebRTC接続状態変更
-    handleWebRTCConnectionChange(state) {
-        this.showDebugLog('info', `WebRTC接続状態: ${state}`);
+    // P2P接続状態変更
+    handleP2PConnectionChange(state, errorMessage = null) {
+        this.showDebugLog('info', `P2P接続状態: ${state}`);
         
         switch (state) {
             case 'connected':
-                this.showMessage('接続が確立されました');
+                this.showMessage('P2P接続が確立されました');
                 this.showScreen('role-screen');
-                break;
-            case 'disconnected':
-                this.showMessage('接続が切断されました');
-                this.showScreen('connection-screen');
-                break;
-            case 'failed':
-                this.showMessage('接続に失敗しました');
-                this.showScreen('connection-screen');
-                break;
-        }
-    }
-
-    // カメラ切り替え
-    async toggleCamera() {
-        if (this.qrScanner) {
-            await this.qrScanner.switchCamera();
-        }
-    }
-
-    // 手動入力切り替え
-    toggleManualInput() {
-        const manualInput = document.getElementById('manual-input');
-        const isHidden = manualInput.classList.contains('hidden');
-        
-        if (isHidden) {
-            manualInput.classList.remove('hidden');
-            document.getElementById('manual-input-btn').textContent = '手動入力を閉じる';
-        } else {
-            manualInput.classList.add('hidden');
-            document.getElementById('manual-input-btn').textContent = '手動入力';
-        }
-    }
-
-    // 手動接続
-    async connectManually() {
-        const connectionId = document.getElementById('manual-connection-id').value.trim().toUpperCase();
-        if (!connectionId) {
-            this.showMessage('接続IDを入力してください');
-            return;
-        }
-        
-        // 接続ID形式をチェック
-        if (!/^[A-Z0-9]{6}$/.test(connectionId)) {
-            this.showMessage('接続IDは6文字の英数字で入力してください');
-            return;
-        }
-        
-        this.showDebugLog('info', `手動入力による接続試行: ${connectionId}`);
-        
-        try {
-            await this.connectToQRHost(connectionId);
-        } catch (error) {
-            this.showDebugLog('error', '手動接続失敗', error);
-            
-            // 利用可能な接続IDを表示
-            if (this.webrtcManager) {
-                const availableIds = this.webrtcManager.getAvailableConnectionIds();
-                if (availableIds.length > 0) {
-                    this.showMessage(`接続失敗: ${error.message}\n\n利用可能なID: ${availableIds.join(', ')}`);
-                } else {
-                    this.showMessage(`接続失敗: ${error.message}\n\nホスト側で接続を開始してください。`);
+                
+                // ピア検索を停止
+                if (this.peerDiscovery) {
+                    this.peerDiscovery.stopDiscovery();
                 }
-            } else {
-                this.showMessage(`接続失敗: ${error.message}`);
+                break;
+                
+            case 'disconnected':
+                this.showMessage('P2P接続が切断されました');
+                this.showScreen('connection-screen');
+                break;
+                
+            case 'failed':
+            case 'error':
+                const message = errorMessage || 'P2P接続に失敗しました';
+                this.showMessage(message);
+                this.showScreen('connection-screen');
+                break;
+                
+            case 'waiting':
+                this.showDebugLog('info', '接続待機中...');
+                break;
+                
+            case 'connecting':
+                this.showDebugLog('info', '接続中...');
+                break;
+        }
+    }
+
+    // P2P接続の詳細情報を表示
+    showP2PDebugInfo() {
+        if (this.p2pManager && this.debugMode) {
+            const debugInfo = this.p2pManager.getDebugInfo();
+            this.showDebugLog('info', 'P2P Debug Info:', debugInfo);
+            
+            if (this.peerDiscovery) {
+                const discoveredPeers = this.peerDiscovery.getDiscoveredPeers();
+                this.showDebugLog('info', 'Discovered Peers:', discoveredPeers);
             }
         }
     }
@@ -1210,8 +1220,12 @@ class CommUApp {
     async sendMessage(message) {
         if (this.connectionMethod === 'bluetooth') {
             await this.sendBluetoothMessage(message);
-        } else if (this.connectionMethod === 'webrtc' && this.webrtcManager) {
-            this.webrtcManager.sendMessage(message);
+        } else if (this.connectionMethod === 'p2p' && this.p2pManager) {
+            const success = this.p2pManager.sendMessage(message);
+            if (!success) {
+                this.showDebugLog('warn', 'P2Pメッセージ送信失敗', message);
+                this.showMessage('メッセージの送信に失敗しました');
+            }
         } else {
             this.showDebugLog('warn', 'メッセージ送信失敗: 接続なし', message);
             this.showMessage('接続されていません');

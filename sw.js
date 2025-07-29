@@ -1,5 +1,5 @@
-const CACHE_NAME = 'commu-v2.2.1';
-const APP_VERSION = '2.2.1';
+const CACHE_NAME = 'commu-v2.3.1';
+const APP_VERSION = '2.3.1';
 
 // バージョン更新時に古いキャッシュを削除
 const urlsToCache = [
@@ -7,6 +7,7 @@ const urlsToCache = [
   './index.html',
   './styles.css',
   './app.js',
+  './p2p-utils.js',
   './manifest.json'
 ];
 
