@@ -23,6 +23,10 @@ class CommUApp {
         this.reconnectAttempts = 0; // 再接続試行回数
         this.maxReconnectAttempts = 3; // 最大再接続試行回数
         this.debugMode = false; // デバッグモード
+        this.connectionMethod = null; // 'bluetooth' または 'webrtc'
+        this.webrtcManager = null; // WebRTC接続管理
+        this.qrGenerator = null; // QRコード生成
+        this.qrScanner = null; // QRコードスキャナー
         
         this.init();
     }
@@ -77,6 +81,19 @@ class CommUApp {
         document.getElementById('export-csv').addEventListener('click', () => this.exportData('csv'));
         document.getElementById('export-email').addEventListener('click', () => this.exportData('email'));
         document.getElementById('skip-export').addEventListener('click', () => this.skipExport());
+
+        // 接続方法選択
+        document.getElementById('qr-connection').addEventListener('click', () => this.selectConnectionMethod('webrtc'));
+        document.getElementById('bluetooth-connection').addEventListener('click', () => this.selectConnectionMethod('bluetooth'));
+        document.getElementById('back-to-connection').addEventListener('click', () => this.showScreen('connection-screen'));
+
+        // QRコード接続
+        document.getElementById('qr-host-btn').addEventListener('click', () => this.startQRHost());
+        document.getElementById('qr-scan-btn').addEventListener('click', () => this.startQRScan());
+        document.getElementById('back-from-qr').addEventListener('click', () => this.showScreen('connection-screen'));
+        document.getElementById('toggle-camera').addEventListener('click', () => this.toggleCamera());
+        document.getElementById('manual-input-btn').addEventListener('click', () => this.toggleManualInput());
+        document.getElementById('manual-connect-btn').addEventListener('click', () => this.connectManually());
 
         // デバッグ機能（隠しコマンド：タイトルを5回タップ）
         let tapCount = 0;
@@ -514,8 +531,8 @@ class CommUApp {
         this.addToChatHistory('questioner', questionText);
         document.getElementById('question-input').value = '';
 
-        // Bluetooth経由で質問を送信
-        this.sendBluetoothMessage({
+        // 統合メッセージ送信
+        this.sendMessage({
             type: 'question',
             data: questionData
         });
@@ -992,8 +1009,175 @@ class CommUApp {
         this.connectedDevices = [];
         this.messageBuffer.clear();
         
-        // 画面をBluetooth接続画面に戻す
-        this.showScreen('bluetooth-screen');
+        // 画面を接続方法選択画面に戻す
+        this.showScreen('connection-screen');
+    }
+
+    // 接続方法選択
+    selectConnectionMethod(method) {
+        this.connectionMethod = method;
+        this.showDebugLog('info', `接続方法を選択: ${method}`);
+        
+        if (method === 'bluetooth') {
+            this.showScreen('bluetooth-screen');
+        } else if (method === 'webrtc') {
+            this.showScreen('qr-screen');
+        }
+    }
+
+    // QRコードホスト開始
+    async startQRHost() {
+        try {
+            this.showDebugLog('info', 'QRコードホストを開始');
+            
+            if (!this.webrtcManager) {
+                this.webrtcManager = new WebRTCManager();
+                this.webrtcManager.onMessage = (message) => this.processMessage(message);
+                this.webrtcManager.onConnectionChange = (state) => this.handleWebRTCConnectionChange(state);
+            }
+            
+            const connectionId = await this.webrtcManager.createHost();
+            
+            // QRコードを生成
+            const canvas = document.getElementById('qr-canvas');
+            if (!this.qrGenerator) {
+                this.qrGenerator = new QRCodeGenerator(canvas);
+            }
+            this.qrGenerator.generate(connectionId);
+            
+            // 接続IDを表示
+            document.getElementById('connection-id').textContent = connectionId;
+            
+            // ホスト画面を表示
+            document.getElementById('qr-role-selection').classList.add('hidden');
+            document.getElementById('qr-host-section').classList.remove('hidden');
+            
+            this.showMessage(`接続ID: ${connectionId}`);
+            
+        } catch (error) {
+            this.showDebugLog('error', 'QRコードホスト開始失敗', error);
+            this.showMessage(`接続に失敗しました: ${error.message}`);
+        }
+    }
+
+    // QRコードスキャン開始
+    async startQRScan() {
+        try {
+            this.showDebugLog('info', 'QRコードスキャンを開始');
+            
+            const video = document.getElementById('camera-video');
+            if (!this.qrScanner) {
+                this.qrScanner = new QRCodeScanner(video);
+            }
+            
+            const cameraStarted = await this.qrScanner.startCamera();
+            if (!cameraStarted) {
+                throw new Error('カメラにアクセスできません');
+            }
+            
+            // スキャン画面を表示
+            document.getElementById('qr-role-selection').classList.add('hidden');
+            document.getElementById('qr-client-section').classList.remove('hidden');
+            
+            // QRコードスキャンを開始
+            this.qrScanner.startScanning((connectionId) => {
+                this.connectToQRHost(connectionId);
+            });
+            
+        } catch (error) {
+            this.showDebugLog('error', 'QRコードスキャン開始失敗', error);
+            this.showMessage(`カメラエラー: ${error.message}`);
+        }
+    }
+
+    // QRコードホストに接続
+    async connectToQRHost(connectionId) {
+        try {
+            this.showDebugLog('info', `QRコードホストに接続: ${connectionId}`);
+            
+            if (!this.webrtcManager) {
+                this.webrtcManager = new WebRTCManager();
+                this.webrtcManager.onMessage = (message) => this.processMessage(message);
+                this.webrtcManager.onConnectionChange = (state) => this.handleWebRTCConnectionChange(state);
+            }
+            
+            await this.webrtcManager.connectToHost(connectionId);
+            
+            // カメラを停止
+            if (this.qrScanner) {
+                this.qrScanner.stopCamera();
+            }
+            
+            document.getElementById('client-status').textContent = '接続しています...';
+            
+        } catch (error) {
+            this.showDebugLog('error', 'QRコードホスト接続失敗', error);
+            this.showMessage(`接続に失敗しました: ${error.message}`);
+        }
+    }
+
+    // WebRTC接続状態変更
+    handleWebRTCConnectionChange(state) {
+        this.showDebugLog('info', `WebRTC接続状態: ${state}`);
+        
+        switch (state) {
+            case 'connected':
+                this.showMessage('接続が確立されました');
+                this.showScreen('role-screen');
+                break;
+            case 'disconnected':
+                this.showMessage('接続が切断されました');
+                this.showScreen('connection-screen');
+                break;
+            case 'failed':
+                this.showMessage('接続に失敗しました');
+                this.showScreen('connection-screen');
+                break;
+        }
+    }
+
+    // カメラ切り替え
+    async toggleCamera() {
+        if (this.qrScanner) {
+            await this.qrScanner.switchCamera();
+        }
+    }
+
+    // 手動入力切り替え
+    toggleManualInput() {
+        const manualInput = document.getElementById('manual-input');
+        const isHidden = manualInput.classList.contains('hidden');
+        
+        if (isHidden) {
+            manualInput.classList.remove('hidden');
+            document.getElementById('manual-input-btn').textContent = '手動入力を閉じる';
+        } else {
+            manualInput.classList.add('hidden');
+            document.getElementById('manual-input-btn').textContent = '手動入力';
+        }
+    }
+
+    // 手動接続
+    async connectManually() {
+        const connectionId = document.getElementById('manual-connection-id').value.trim();
+        if (!connectionId) {
+            this.showMessage('接続IDを入力してください');
+            return;
+        }
+        
+        await this.connectToQRHost(connectionId);
+    }
+
+    // メッセージ送信（統合版）
+    async sendMessage(message) {
+        if (this.connectionMethod === 'bluetooth') {
+            await this.sendBluetoothMessage(message);
+        } else if (this.connectionMethod === 'webrtc' && this.webrtcManager) {
+            this.webrtcManager.sendMessage(message);
+        } else {
+            this.showDebugLog('warn', 'メッセージ送信失敗: 接続なし', message);
+            this.showMessage('接続されていません');
+        }
     }
 }
 

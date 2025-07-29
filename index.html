@@ -23,15 +23,36 @@
     </div>
 
     <div id="app">
-        <!-- Bluetooth接続画面 -->
-        <div id="bluetooth-screen" class="screen active">
+        <!-- 接続方法選択画面 -->
+        <div id="connection-screen" class="screen active">
             <div class="container">
                 <h1 class="app-title">CommU⇆</h1>
-                <p class="subtitle">デバイス同士をつなげましょう</p>
+                <p class="subtitle">接続方法を選んでください</p>
                 <div class="version-info">
-                    <span>バージョン: </span><span id="app-version">2.1.0</span>
+                    <span>バージョン: </span><span id="app-version">2.2.0</span>
                     <span class="version-status" id="version-status">確認中...</span>
                 </div>
+                
+                <div class="connection-methods">
+                    <button class="connection-method-btn qr-btn" id="qr-connection">
+                        <div class="method-icon">📱</div>
+                        <span class="method-title">QRコード接続</span>
+                        <span class="method-desc">カメラでQRコードを読み取り</span>
+                    </button>
+                    <button class="connection-method-btn bluetooth-btn" id="bluetooth-connection">
+                        <div class="method-icon">📡</div>
+                        <span class="method-title">Bluetooth接続</span>
+                        <span class="method-desc">近距離無線通信</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bluetooth接続画面 -->
+        <div id="bluetooth-screen" class="screen">
+            <div class="container">
+                <h2>Bluetooth接続</h2>
+                <p class="subtitle">デバイス同士をつなげましょう</p>
                 
                 <!-- 環境チェック情報 -->
                 <div id="environment-check" style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; font-size: 0.9rem;">
@@ -43,6 +64,7 @@
                 <div class="button-group">
                     <button class="primary-btn" id="host-btn">ホストになる</button>
                     <button class="secondary-btn" id="connect-btn">相手とつながる</button>
+                    <button class="secondary-btn" id="back-to-connection">戻る</button>
                 </div>
                 
                 <!-- テスト用ボタン -->
@@ -52,6 +74,50 @@
                     <button class="secondary-btn" id="test-bluetooth" style="margin: 5px; padding: 8px 12px; font-size: 0.8rem;">Bluetoothテスト</button>
                     <button class="secondary-btn" id="demo-mode" style="margin: 5px; padding: 8px 12px; font-size: 0.8rem;">デモモード</button>
                     <button class="secondary-btn" id="clear-cache" style="margin: 5px; padding: 8px 12px; font-size: 0.8rem;">キャッシュクリア</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- QRコード接続画面 -->
+        <div id="qr-screen" class="screen">
+            <div class="container">
+                <h2>QRコード接続</h2>
+                <div id="qr-host-section" class="qr-section hidden">
+                    <p class="subtitle">このQRコードを相手に読み取ってもらってください</p>
+                    <div class="qr-container">
+                        <canvas id="qr-canvas" width="256" height="256"></canvas>
+                    </div>
+                    <div class="connection-info">
+                        <p>接続ID: <span id="connection-id"></span></p>
+                        <p class="status-text" id="host-status">相手の接続を待っています...</p>
+                    </div>
+                </div>
+                
+                <div id="qr-client-section" class="qr-section hidden">
+                    <p class="subtitle">相手のQRコードをカメラで読み取ってください</p>
+                    <div class="camera-container">
+                        <video id="camera-video" autoplay playsinline></video>
+                        <div class="scan-overlay">
+                            <div class="scan-line"></div>
+                        </div>
+                    </div>
+                    <div class="camera-controls">
+                        <button class="secondary-btn" id="toggle-camera">カメラ切替</button>
+                        <button class="secondary-btn" id="manual-input-btn">手動入力</button>
+                    </div>
+                    <div class="manual-input hidden" id="manual-input">
+                        <input type="text" id="manual-connection-id" placeholder="接続IDを入力">
+                        <button class="primary-btn" id="manual-connect-btn">接続</button>
+                    </div>
+                    <p class="status-text" id="client-status">QRコードをスキャンしてください</p>
+                </div>
+
+                <div id="qr-role-selection" class="qr-section">
+                    <div class="button-group">
+                        <button class="primary-btn" id="qr-host-btn">QRコードを生成</button>
+                        <button class="secondary-btn" id="qr-scan-btn">QRコードを読み取り</button>
+                        <button class="secondary-btn" id="back-from-qr">戻る</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -286,7 +352,7 @@
                 // バージョン情報を取得
                 const messageChannel = new MessageChannel();
                 messageChannel.port1.onmessage = function(event) {
-                    const currentVersion = '2.1.0';
+                    const currentVersion = '2.2.0';
                     const swVersion = event.data.version;
                     const versionStatus = document.getElementById('version-status');
                     
@@ -396,6 +462,7 @@
     });
     </script>
 
-    <script src="app.js?v=2.1.0"></script>
+    <script src="qr-utils.js?v=2.2.0"></script>
+    <script src="app.js?v=2.2.0"></script>
 </body>
 </html>
