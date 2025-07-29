@@ -1,9 +1,5 @@
 class CommUApp {
     constructor() {
-        this.bluetoothDevice = null;
-        this.bluetoothServer = null;
-        this.bluetoothService = null;
-        this.bluetoothCharacteristic = null;
         this.isHost = false;
         this.currentRole = null;
         this.currentRoom = null;
@@ -23,7 +19,7 @@ class CommUApp {
         this.reconnectAttempts = 0; // 再接続試行回数
         this.maxReconnectAttempts = 3; // 最大再接続試行回数
         this.debugMode = false; // デバッグモード
-        this.connectionMethod = null; // 'bluetooth' または 'p2p'
+        this.connectionMethod = 'p2p'; // P2P通信のみ
         this.p2pManager = null; // P2P接続管理
         this.peerDiscovery = null; // ピア検索機能
         
@@ -70,9 +66,6 @@ class CommUApp {
     }
 
     setupEventListeners() {
-        // Bluetooth接続
-        document.getElementById('host-btn').addEventListener('click', () => this.startHost());
-        document.getElementById('connect-btn').addEventListener('click', () => this.connectToDevice());
 
         // 役割選択
         document.getElementById('questioner-role').addEventListener('click', () => this.selectRole('questioner'));
@@ -117,7 +110,6 @@ class CommUApp {
 
         // 接続方法選択
         document.getElementById('p2p-connection').addEventListener('click', () => this.selectConnectionMethod('p2p'));
-        document.getElementById('bluetooth-connection').addEventListener('click', () => this.selectConnectionMethod('bluetooth'));
         document.getElementById('back-to-connection').addEventListener('click', () => this.showScreen('connection-screen'));
 
         // P2P接続
@@ -181,174 +173,10 @@ class CommUApp {
         display.textContent = padded;
     }
 
-    async startHost() {
-        try {
-            this.isHost = true;
-            this.showDebugLog('info', 'ホストとして接続を開始');
-            // Bluetooth接続の実装（Web Bluetooth APIを使用）
-            await this.requestBluetoothDevice();
-            this.showScreen('role-screen');
-        } catch (error) {
-            this.showDebugLog('error', 'Bluetooth host start failed', error);
-            this.showMessage(`Bluetooth接続に失敗しました: ${error.message}`);
-        }
-    }
 
-    async connectToDevice() {
-        try {
-            this.isHost = false;
-            await this.requestBluetoothDevice();
-            this.showScreen('role-screen');
-        } catch (error) {
-            console.error('Bluetooth connection failed:', error);
-            this.showMessage('Bluetooth接続に失敗しました');
-        }
-    }
 
-    async requestBluetoothDevice() {
-        if (!navigator.bluetooth) {
-            throw new Error('Bluetooth APIがサポートされていません。HTTPS環境で実行してください。');
-        }
 
-        // CommUアプリ専用のBluetooth Low Energy サービスUUID
-        const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e'; // Nordic UART Service
-        const TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // TX Characteristic
-        const RX_CHARACTERISTIC_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // RX Characteristic
 
-        try {
-            // デバイスの検索と選択
-            this.showMessage('Bluetoothデバイスを検索中...');
-            
-            this.bluetoothDevice = await navigator.bluetooth.requestDevice({
-                filters: [
-                    { services: [SERVICE_UUID] },
-                    { namePrefix: 'CommU' },
-                    { namePrefix: 'ESP32' },
-                    { namePrefix: 'Arduino' }
-                ],
-                optionalServices: [SERVICE_UUID]
-            });
-
-            // 切断イベントの監視
-            this.bluetoothDevice.addEventListener('gattserverdisconnected', () => {
-                this.onBluetoothDisconnected();
-            });
-
-            this.showMessage('デバイスに接続中...');
-            this.bluetoothServer = await this.bluetoothDevice.gatt.connect();
-            
-            this.showMessage('サービスを取得中...');
-            this.bluetoothService = await this.bluetoothServer.getPrimaryService(SERVICE_UUID);
-            
-            // 送信用特性（ホスト側）
-            if (this.isHost) {
-                this.bluetoothTxCharacteristic = await this.bluetoothService.getCharacteristic(TX_CHARACTERISTIC_UUID);
-                this.bluetoothRxCharacteristic = await this.bluetoothService.getCharacteristic(RX_CHARACTERISTIC_UUID);
-                
-                // 受信通知を有効化
-                await this.bluetoothRxCharacteristic.startNotifications();
-                this.bluetoothRxCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    this.handleBluetoothMessage(event);
-                });
-            } else {
-                // クライアント側
-                this.bluetoothTxCharacteristic = await this.bluetoothService.getCharacteristic(RX_CHARACTERISTIC_UUID);
-                this.bluetoothRxCharacteristic = await this.bluetoothService.getCharacteristic(TX_CHARACTERISTIC_UUID);
-                
-                // 受信通知を有効化
-                await this.bluetoothRxCharacteristic.startNotifications();
-                this.bluetoothRxCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    this.handleBluetoothMessage(event);
-                });
-            }
-
-            this.showMessage('Bluetooth接続が完了しました');
-            
-            // 接続確認メッセージを送信
-            setTimeout(() => {
-                this.sendBluetoothMessage({
-                    type: 'connection_established',
-                    data: { 
-                        deviceId: this.generateDeviceId(),
-                        isHost: this.isHost,
-                        timestamp: new Date().toISOString()
-                    }
-                });
-            }, 1000);
-
-        } catch (error) {
-            console.error('Bluetooth connection error:', error);
-            
-            if (error.name === 'NotFoundError') {
-                throw new Error('対応するBluetoothデバイスが見つかりませんでした。デバイスの電源を確認してください。');
-            } else if (error.name === 'SecurityError') {
-                throw new Error('Bluetooth接続がブロックされました。HTTPS環境で実行してください。');
-            } else if (error.name === 'NetworkError') {
-                throw new Error('Bluetoothデバイスとの通信に失敗しました。距離を近づけて再試行してください。');
-            } else {
-                throw new Error(`Bluetooth接続エラー: ${error.message}`);
-            }
-        }
-    }
-
-    handleBluetoothMessage(event) {
-        try {
-            const data = new Uint8Array(event.target.value.buffer);
-            
-            // 分割メッセージかどうかをチェック
-            if (data.length > 2 && data[1] > 1) {
-                // 分割メッセージの処理
-                this.handleChunkedMessage(data);
-                return;
-            }
-            
-            // 通常のメッセージ処理
-            const value = new TextDecoder().decode(data);
-            const message = JSON.parse(value);
-            
-            this.processMessage(message);
-            
-        } catch (error) {
-            console.error('Failed to process Bluetooth message:', error);
-        }
-    }
-
-    handleChunkedMessage(data) {
-        const chunkNumber = data[0];
-        const totalChunks = data[1];
-        const messageData = data.slice(2);
-        const messageId = `msg_${Date.now()}`; // 簡易的なメッセージID
-        
-        if (!this.messageBuffer.has(messageId)) {
-            this.messageBuffer.set(messageId, {
-                chunks: new Array(totalChunks),
-                receivedChunks: 0
-            });
-        }
-        
-        const buffer = this.messageBuffer.get(messageId);
-        buffer.chunks[chunkNumber] = messageData;
-        buffer.receivedChunks++;
-        
-        // すべてのチャンクが揃った場合
-        if (buffer.receivedChunks === totalChunks) {
-            const completeData = new Uint8Array(
-                buffer.chunks.reduce((total, chunk) => total + chunk.length, 0)
-            );
-            
-            let offset = 0;
-            buffer.chunks.forEach(chunk => {
-                completeData.set(chunk, offset);
-                offset += chunk.length;
-            });
-            
-            const value = new TextDecoder().decode(completeData);
-            const message = JSON.parse(value);
-            
-            this.processMessage(message);
-            this.messageBuffer.delete(messageId);
-        }
-    }
 
     processMessage(message) {
         switch (message.type) {
@@ -379,61 +207,7 @@ class CommUApp {
         }
     }
 
-    async sendBluetoothMessage(message) {
-        if (this.bluetoothTxCharacteristic && this.bluetoothServer && this.bluetoothServer.connected) {
-            try {
-                const messageString = JSON.stringify(message);
-                const data = new TextEncoder().encode(messageString);
-                
-                // メッセージサイズ制限（BLEの制限に対応）
-                const MAX_CHUNK_SIZE = 20;
-                
-                if (data.length <= MAX_CHUNK_SIZE) {
-                    await this.bluetoothTxCharacteristic.writeValue(data);
-                } else {
-                    // 大きなメッセージを分割して送信
-                    await this.sendLargeMessage(data);
-                }
-                
-                console.log('Bluetooth message sent:', message.type);
-                
-            } catch (error) {
-                console.error('Failed to send Bluetooth message:', error);
-                this.showMessage(`送信エラー: ${error.message}`);
-                
-                // 再接続を試行
-                if (error.name === 'NetworkError') {
-                    this.attemptReconnection();
-                }
-            }
-        } else {
-            console.log('Bluetooth not connected, message queued:', message);
-            // デモ用のシミュレーション（実際の実装では再接続またはキューイング）
-            this.showMessage('Bluetooth未接続 - デモモードで動作中');
-        }
-    }
 
-    async sendLargeMessage(data) {
-        const MAX_CHUNK_SIZE = 20;
-        const totalChunks = Math.ceil(data.length / MAX_CHUNK_SIZE);
-        
-        for (let i = 0; i < totalChunks; i++) {
-            const start = i * MAX_CHUNK_SIZE;
-            const end = Math.min(start + MAX_CHUNK_SIZE, data.length);
-            const chunk = data.slice(start, end);
-            
-            // チャンクヘッダーを追加（チャンク番号/総チャンク数）
-            const chunkWithHeader = new Uint8Array(chunk.length + 2);
-            chunkWithHeader[0] = i; // チャンク番号
-            chunkWithHeader[1] = totalChunks; // 総チャンク数
-            chunkWithHeader.set(chunk, 2);
-            
-            await this.bluetoothTxCharacteristic.writeValue(chunkWithHeader);
-            
-            // 短い待機時間（BLEの安定性のため）
-            await new Promise(resolve => setTimeout(resolve, 10));
-        }
-    }
 
     selectRole(role) {
         this.currentRole = role;
@@ -465,8 +239,8 @@ class CommUApp {
         document.getElementById('current-room-id').textContent = roomId;
         this.showScreen('questioner-screen');
         
-        // ルーム作成をBluetooth経由で通知
-        this.sendBluetoothMessage({
+        // ルーム作成をP2P経由で通知
+        this.sendMessage({
             type: 'room_created',
             data: { roomId: roomId, creatorRole: 'questioner' }
         });
@@ -531,14 +305,14 @@ class CommUApp {
         this.showScreen('answerer-screen');
         document.getElementById('answerer-content').classList.remove('hidden');
         
-        // ルーム参加をBluetooth経由で通知
-        this.sendBluetoothMessage({
+        // ルーム参加をP2P経由で通知
+        this.sendMessage({
             type: 'room_joined',
             data: { roomId: roomId, joinerRole: 'answerer' }
         });
         
         // 質問者に参加通知を送信
-        this.sendBluetoothMessage({
+        this.sendMessage({
             type: 'participant_joined',
             data: { roomId: roomId, role: 'answerer' }
         });
@@ -613,8 +387,8 @@ class CommUApp {
             timestamp: new Date().toISOString()
         };
 
-        // Bluetooth経由で回答を送信
-        this.sendBluetoothMessage({
+        // P2P経由で回答を送信
+        this.sendMessage({
             type: 'answer',
             data: answerData
         });
@@ -640,8 +414,8 @@ class CommUApp {
 
         document.getElementById('text-answer-input').value = '';
 
-        // Bluetooth経由で回答を送信
-        this.sendBluetoothMessage({
+        // P2P経由で回答を送信
+        this.sendMessage({
             type: 'answer',
             data: answerData
         });
@@ -666,8 +440,8 @@ class CommUApp {
 
         document.getElementById('free-message-input').value = '';
 
-        // Bluetooth経由でメッセージを送信
-        this.sendBluetoothMessage({
+        // P2P経由でメッセージを送信
+        this.sendMessage({
             type: 'message',
             data: messageData
         });
@@ -981,10 +755,6 @@ class CommUApp {
         }
     }
 
-    // 新しいBluetoothメソッド
-    generateDeviceId() {
-        return 'device_' + Math.random().toString(36).substr(2, 9);
-    }
 
     handleConnectionEstablished(data) {
         console.log('Connection established with device:', data.deviceId);
@@ -992,66 +762,15 @@ class CommUApp {
         this.reconnectAttempts = 0; // 再接続カウンターをリセット
     }
 
-    onBluetoothDisconnected() {
-        console.log('Bluetooth device disconnected');
-        this.showMessage('Bluetooth接続が切断されました');
-        
-        // 再接続を試行
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.attemptReconnection();
-        } else {
-            this.showMessage('再接続に失敗しました。手動で再接続してください。');
-            this.resetToBluetoothScreen();
-        }
-    }
 
-    async attemptReconnection() {
-        this.reconnectAttempts++;
-        this.showMessage(`再接続を試行中... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-        
-        try {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機
-            
-            if (this.bluetoothDevice && this.bluetoothDevice.gatt) {
-                this.bluetoothServer = await this.bluetoothDevice.gatt.connect();
-                this.showMessage('再接続に成功しました');
-                this.reconnectAttempts = 0;
-            }
-        } catch (error) {
-            console.error('Reconnection failed:', error);
-            
-            if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                setTimeout(() => this.attemptReconnection(), 3000);
-            } else {
-                this.showMessage('再接続に失敗しました');
-                this.resetToBluetoothScreen();
-            }
-        }
-    }
 
-    resetToBluetoothScreen() {
-        // Bluetooth接続をリセット
-        this.bluetoothDevice = null;
-        this.bluetoothServer = null;
-        this.bluetoothService = null;
-        this.bluetoothTxCharacteristic = null;
-        this.bluetoothRxCharacteristic = null;
-        this.isAnswererConnected = false;
-        this.connectedDevices = [];
-        this.messageBuffer.clear();
-        
-        // 画面を接続方法選択画面に戻す
-        this.showScreen('connection-screen');
-    }
 
     // 接続方法選択
     selectConnectionMethod(method) {
         this.connectionMethod = method;
         this.showDebugLog('info', `接続方法を選択: ${method}`);
         
-        if (method === 'bluetooth') {
-            this.showScreen('bluetooth-screen');
-        } else if (method === 'p2p') {
+        if (method === 'p2p') {
             this.showScreen('p2p-screen');
         }
     }
@@ -1080,14 +799,8 @@ class CommUApp {
             document.getElementById('p2p-role-selection').classList.add('hidden');
             document.getElementById('p2p-host-section').classList.remove('hidden');
             
-            // ピア検索を開始
-            if (!this.peerDiscovery) {
-                this.peerDiscovery = new PeerDiscovery(this.p2pManager);
-                this.peerDiscovery.onPeerDiscovered = (discoveredPeerId) => {
-                    this.showDebugLog('info', `ピア発見: ${discoveredPeerId}`);
-                };
-            }
-            this.peerDiscovery.startDiscovery();
+            // ピア検索は手動接続のみに限定（自動検索を無効化）
+            // 自動ピア検索はコンソールエラーの原因となるため無効化
             
             this.showMessage(`ピアID: ${peerId}\n他のデバイスからの接続を待っています`);
             
@@ -1175,10 +888,7 @@ class CommUApp {
                 this.showMessage('P2P接続が確立されました');
                 this.showScreen('role-screen');
                 
-                // ピア検索を停止
-                if (this.peerDiscovery) {
-                    this.peerDiscovery.stopDiscovery();
-                }
+                // P2P接続が成功したため、接続処理完了
                 break;
                 
             case 'disconnected':
@@ -1208,27 +918,20 @@ class CommUApp {
         if (this.p2pManager && this.debugMode) {
             const debugInfo = this.p2pManager.getDebugInfo();
             this.showDebugLog('info', 'P2P Debug Info:', debugInfo);
-            
-            if (this.peerDiscovery) {
-                const discoveredPeers = this.peerDiscovery.getDiscoveredPeers();
-                this.showDebugLog('info', 'Discovered Peers:', discoveredPeers);
-            }
         }
     }
 
-    // メッセージ送信（統合版）
+    // メッセージ送信（P2Pのみ）
     async sendMessage(message) {
-        if (this.connectionMethod === 'bluetooth') {
-            await this.sendBluetoothMessage(message);
-        } else if (this.connectionMethod === 'p2p' && this.p2pManager) {
+        if (this.connectionMethod === 'p2p' && this.p2pManager) {
             const success = this.p2pManager.sendMessage(message);
             if (!success) {
                 this.showDebugLog('warn', 'P2Pメッセージ送信失敗', message);
                 this.showMessage('メッセージの送信に失敗しました');
             }
         } else {
-            this.showDebugLog('warn', 'メッセージ送信失敗: 接続なし', message);
-            this.showMessage('接続されていません');
+            this.showDebugLog('warn', 'メッセージ送信失敗: P2P接続なし', message);
+            this.showMessage('P2P接続されていません');
         }
     }
 }
