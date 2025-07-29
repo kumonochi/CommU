@@ -1,0 +1,22 @@
+{
+  "name": "CommU⇆",
+  "short_name": "CommU",
+  "description": "質問と4択回答でコミュニケーションを支援するアプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#E8F5E8",
+  "theme_color": "#4CAF50",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

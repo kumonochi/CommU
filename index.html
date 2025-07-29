@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CommU⇆</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Bluetooth接続画面 -->
+        <div id="bluetooth-screen" class="screen active">
+            <div class="container">
+                <h1 class="app-title">CommU⇆</h1>
+                <p class="subtitle">デバイス同士をつなげましょう</p>
+                <div class="button-group">
+                    <button class="primary-btn" id="host-btn">ホストになる</button>
+                    <button class="secondary-btn" id="connect-btn">相手とつながる</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 役割選択画面 -->
+        <div id="role-screen" class="screen">
+            <div class="container">
+                <h2>役割を選んでください</h2>
+                <div class="role-buttons">
+                    <button class="role-btn questioner-btn" id="questioner-role">
+                        <div class="role-icon">❓</div>
+                        <span>質問する人になる</span>
+                    </button>
+                    <button class="role-btn answerer-btn" id="answerer-role">
+                        <div class="role-icon">💭</div>
+                        <span>答える人になる</span>
+                    </button>
+                    <button class="role-btn sound-btn" id="sound-role">
+                        <div class="role-icon">🔊</div>
+                        <span>言葉で質問・音で回答</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ルーム作成画面 -->
+        <div id="room-create-screen" class="screen">
+            <div class="container">
+                <h2>ルームを作成</h2>
+                <p>5桁のルームIDを決めてください</p>
+                <div class="room-id-display">
+                    <span id="room-id-input">-----</span>
+                </div>
+                <div class="numpad">
+                    <button class="num-btn" data-num="1">1</button>
+                    <button class="num-btn" data-num="2">2</button>
+                    <button class="num-btn" data-num="3">3</button>
+                    <button class="num-btn" data-num="4">4</button>
+                    <button class="num-btn" data-num="5">5</button>
+                    <button class="num-btn" data-num="6">6</button>
+                    <button class="num-btn" data-num="7">7</button>
+                    <button class="num-btn" data-num="8">8</button>
+                    <button class="num-btn" data-num="9">9</button>
+                    <button class="num-btn clear-btn">クリア</button>
+                    <button class="num-btn" data-num="0">0</button>
+                    <button class="num-btn random-btn">ランダム</button>
+                </div>
+                <div class="button-group">
+                    <button class="primary-btn" id="create-room-btn" disabled>ルームを作成</button>
+                    <button class="secondary-btn" id="back-to-role-btn">戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ルーム参加画面 -->
+        <div id="room-join-screen" class="screen">
+            <div class="container">
+                <h2>ルームを選択</h2>
+                <div id="room-list" class="room-list">
+                    <!-- ルーム一覧が動的に生成される -->
+                </div>
+                <button class="secondary-btn" id="back-to-role-btn2">戻る</button>
+            </div>
+        </div>
+
+        <!-- 質問者画面 -->
+        <div id="questioner-screen" class="screen">
+            <div class="container">
+                <div class="room-info">
+                    <span>ルーム: <span id="current-room-id"></span></span>
+                    <button class="exit-btn" id="exit-room-btn">退出</button>
+                </div>
+                
+                <div id="waiting-message" class="waiting-message">
+                    回答者を待っています...
+                </div>
+
+                <div id="questioner-content" class="hidden">
+                    <div class="history-section">
+                        <h3>やりとり履歴</h3>
+                        <div id="chat-history" class="chat-history"></div>
+                    </div>
+
+                    <div class="question-section">
+                        <div class="animation-selector">
+                            <label>アニメーション:</label>
+                            <select id="animation-select">
+                                <option value="none">なし</option>
+                                <option value="typewriter">タイプライター</option>
+                                <option value="wave">波</option>
+                                <option value="fadeIn">フェードイン</option>
+                                <option value="jump">ジャンプ</option>
+                                <option value="spin">スピン</option>
+                            </select>
+                        </div>
+                        <textarea id="question-input" placeholder="質問を入力してください"></textarea>
+                        <button class="primary-btn" id="send-question-btn">質問を送信</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 回答者画面 -->
+        <div id="answerer-screen" class="screen">
+            <div class="container">
+                <div class="room-info">
+                    <span>ルーム: <span id="current-room-id-answerer"></span></span>
+                    <button class="exit-btn" id="exit-room-btn-answerer">退出</button>
+                </div>
+
+                <div id="waiting-question" class="waiting-message">
+                    質問を待っています...
+                </div>
+
+                <div id="answerer-content" class="hidden">
+                    <div class="message-section">
+                        <textarea id="free-message-input" placeholder="質問者にメッセージを送れます（「やっほー」「眠いよー！」「○○の質問は答えづらいかも…」など）"></textarea>
+                        <button class="secondary-btn" id="send-message-btn">メッセージ送信</button>
+                    </div>
+
+                    <div class="question-display">
+                        <h3>質問</h3>
+                        <div id="question-text" class="question-text"></div>
+                    </div>
+
+                    <div class="answer-section">
+                        <div class="answer-customize">
+                            <button class="customize-btn" id="customize-yes">はい</button>
+                            <button class="customize-btn" id="customize-no">いいえ</button>
+                        </div>
+                        
+                        <div class="sound-selector">
+                            <label>効果音:</label>
+                            <select id="sound-select">
+                                <option value="none">なし</option>
+                                <option value="ping">ピンポン</option>
+                                <option value="buzz">ブブッ</option>
+                                <option value="sparkle">きらきら</option>
+                                <option value="don">デーン…</option>
+                                <option value="deden">デデン！</option>
+                            </select>
+                        </div>
+
+                        <div class="answer-buttons">
+                            <button class="answer-btn yes-btn" id="answer-yes">はい</button>
+                            <button class="answer-btn no-btn" id="answer-no">いいえ</button>
+                            <button class="answer-btn maybe-btn" id="answer-maybe">わからない</button>
+                            <button class="answer-btn refuse-btn" id="answer-refuse">答えたくない</button>
+                        </div>
+
+                        <div class="text-answer-section">
+                            <textarea id="text-answer-input" placeholder="テキストで回答する場合はこちらに入力"></textarea>
+                            <button class="secondary-btn" id="send-text-answer-btn">テキスト回答を送信</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 音響モード画面 -->
+        <div id="sound-mode-screen" class="screen">
+            <div class="container">
+                <h2>音響モード</h2>
+                <div class="sound-mode-toggle">
+                    <label>
+                        <input type="checkbox" id="voice-synthesis-toggle">
+                        合成音声を使用
+                    </label>
+                </div>
+                <div class="sound-answer-buttons">
+                    <button class="sound-answer-btn" data-answer="yes">はい</button>
+                    <button class="sound-answer-btn" data-answer="no">いいえ</button>
+                    <button class="sound-answer-btn" data-answer="maybe">わからない</button>
+                    <button class="sound-answer-btn" data-answer="refuse">答えたくない</button>
+                </div>
+                <button class="secondary-btn" id="back-from-sound">戻る</button>
+            </div>
+        </div>
+
+        <!-- カスタマイズモーダル -->
+        <div id="customize-modal" class="modal">
+            <div class="modal-content">
+                <h3 id="customize-title">ボタンをカスタマイズ</h3>
+                <div class="customize-options">
+                    <button class="customize-option" data-value="0"></button>
+                    <button class="customize-option" data-value="1"></button>
+                    <button class="customize-option" data-value="2"></button>
+                </div>
+                <button class="secondary-btn" id="close-customize">閉じる</button>
+            </div>
+        </div>
+
+        <!-- エクスポートモーダル -->
+        <div id="export-modal" class="modal">
+            <div class="modal-content">
+                <h3>やりとりをエクスポート</h3>
+                <p>ルームから退出するとやりとりの履歴は消去されます</p>
+                <div class="export-buttons">
+                    <button class="primary-btn" id="export-txt">TXTでダウンロード</button>
+                    <button class="primary-btn" id="export-csv">CSVでダウンロード</button>
+                    <button class="primary-btn" id="export-email">メールで送信</button>
+                    <button class="secondary-btn" id="skip-export">エクスポートしない</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

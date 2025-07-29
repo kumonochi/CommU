@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アイコン生成</title>
+</head>
+<body>
+    <canvas id="canvas192" width="192" height="192" style="border: 1px solid #ccc; margin: 10px;"></canvas>
+    <canvas id="canvas512" width="512" height="512" style="border: 1px solid #ccc; margin: 10px;"></canvas>
+    
+    <div>
+        <button onclick="downloadIcon192()">192x192をダウンロード</button>
+        <button onclick="downloadIcon512()">512x512をダウンロード</button>
+    </div>
+
+    <script>
+        function createIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // 背景
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#E8F5E8');
+            gradient.addColorStop(1, '#C8E6C9');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // 円形の背景
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size*0.35, 0, Math.PI * 2);
+            ctx.fillStyle = '#4CAF50';
+            ctx.fill();
+            
+            // CommU⇆ のテキスト
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size*0.12}px 'Arial', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // CommU
+            ctx.fillText('CommU', size/2, size*0.42);
+            
+            // ⇆ 記号
+            ctx.font = `${size*0.15}px 'Arial', sans-serif`;
+            ctx.fillText('⇆', size/2, size*0.58);
+            
+            // 装飾的な要素（吹き出し風）
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(size*0.25, size*0.3, size*0.08, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(size*0.75, size*0.7, size*0.06, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function downloadIcon192() {
+            const canvas = document.getElementById('canvas192');
+            const link = document.createElement('a');
+            link.download = 'icon-192.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        function downloadIcon512() {
+            const canvas = document.getElementById('canvas512');
+            const link = document.createElement('a');
+            link.download = 'icon-512.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // アイコンを生成
+        createIcon(document.getElementById('canvas192'), 192);
+        createIcon(document.getElementById('canvas512'), 512);
+    </script>
+</body>
+</html>
