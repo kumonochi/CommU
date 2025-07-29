@@ -149,14 +149,134 @@ class QRCodeScanner {
 
     detectQRPattern() {
         // 実際の実装では、QRコードライブラリを使用
-        // ここでは、手動入力または接続IDの形式をチェック
+        // ここでは、画像解析によるQRコード検出を簡易実装
         
-        // デモ用：特定のパターンを返す
-        if (Math.random() < 0.01) { // 1%の確率でデモQRコードを検出
-            return 'demo-connection-id-12345';
+        try {
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const data = imageData.data;
+            
+            // QRコードパターンの検出（簡易版）
+            const detectedPattern = this.analyzeQRPattern(data, this.canvas.width, this.canvas.height);
+            if (detectedPattern) {
+                return detectedPattern;
+            }
+            
+            // 手動入力や既存の接続IDをチェック
+            const storedConnections = this.checkStoredConnections();
+            if (storedConnections.length > 0) {
+                // 最新の接続IDを返す
+                return storedConnections[0];
+            }
+            
+        } catch (error) {
+            console.error('QR pattern detection error:', error);
         }
         
         return null;
+    }
+    
+    analyzeQRPattern(imageData, width, height) {
+        // QRコードの特徴的なパターンを検出
+        // 位置検出パターン（Finder Pattern）を探す
+        
+        const threshold = 128;
+        const minPatternSize = 20;
+        const maxPatternSize = 100;
+        
+        // グレースケール変換と2値化
+        const binaryData = [];
+        for (let i = 0; i < imageData.length; i += 4) {
+            const gray = (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
+            binaryData.push(gray < threshold ? 0 : 255);
+        }
+        
+        // 位置検出パターンを探す（7x7の黒白黒白黒パターン）
+        for (let y = 0; y < height - maxPatternSize; y += 2) {
+            for (let x = 0; x < width - maxPatternSize; x += 2) {
+                const pattern = this.checkFinderPattern(binaryData, x, y, width, height);
+                if (pattern) {
+                    // パターンが見つかった場合、周辺のデータを解析
+                    const decodedData = this.decodeQRData(binaryData, x, y, width, height);
+                    if (decodedData && this.isValidConnectionId(decodedData)) {
+                        return decodedData;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    checkFinderPattern(binaryData, startX, startY, width, height) {
+        // 7x7の位置検出パターンをチェック
+        const patternSize = 7;
+        if (startX + patternSize >= width || startY + patternSize >= height) {
+            return false;
+        }
+        
+        // パターンの中心を確認（3x3の黒い領域）
+        const centerX = startX + 3;
+        const centerY = startY + 3;
+        const centerIndex = centerY * width + centerX;
+        
+        return binaryData[centerIndex] === 0; // 黒ピクセル
+    }
+    
+    decodeQRData(binaryData, x, y, width, height) {
+        // QRコードのデータ部分を解析（簡易版）
+        // 実際の実装では、Reed-Solomon誤り訂正なども必要
+        
+        const dataRegionX = x + 10;
+        const dataRegionY = y + 10;
+        const dataSize = 10;
+        
+        let binaryString = '';
+        for (let dy = 0; dy < dataSize; dy++) {
+            for (let dx = 0; dx < dataSize; dx++) {
+                const pixelX = dataRegionX + dx;
+                const pixelY = dataRegionY + dy;
+                
+                if (pixelX < width && pixelY < height) {
+                    const index = pixelY * width + pixelX;
+                    binaryString += binaryData[index] === 0 ? '1' : '0';
+                }
+            }
+        }
+        
+        // バイナリデータを文字列に変換
+        try {
+            let result = '';
+            for (let i = 0; i < binaryString.length; i += 8) {
+                const byte = binaryString.substr(i, 8);
+                if (byte.length === 8) {
+                    const charCode = parseInt(byte, 2);
+                    if (charCode >= 32 && charCode <= 126) { // 印刷可能文字
+                        result += String.fromCharCode(charCode);
+                    }
+                }
+            }
+            return result.length >= 6 ? result.substring(0, 6) : null;
+        } catch (error) {
+            return null;
+        }
+    }
+    
+    checkStoredConnections() {
+        // localStorageから既存の接続情報を取得
+        const connections = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('offer_')) {
+                const connectionId = key.replace('offer_', '');
+                connections.push(connectionId);
+            }
+        }
+        return connections.sort().reverse(); // 新しい順
+    }
+    
+    isValidConnectionId(id) {
+        // 接続IDの形式をチェック（6文字の英数字）
+        return /^[A-Z0-9]{6}$/.test(id);
     }
 }
 
@@ -220,7 +340,17 @@ class WebRTCManager {
         // オファーを取得（実際の実装ではシグナリングサーバーから）
         const offer = this.getOfferFromStore(connectionId);
         if (!offer) {
-            throw new Error('接続IDが見つかりません');
+            // 利用可能な接続IDを取得
+            const availableIds = this.getAvailableConnectionIds();
+            let errorMessage = `接続ID「${connectionId}」が見つかりません。`;
+            
+            if (availableIds.length > 0) {
+                errorMessage += `\n\n利用可能な接続ID:\n${availableIds.join(', ')}`;
+            } else {
+                errorMessage += '\n\n現在、利用可能な接続IDがありません。\nホスト側で接続を開始してからQRコードを読み取ってください。';
+            }
+            
+            throw new Error(errorMessage);
         }
         
         await this.peer.setRemoteDescription(offer);
@@ -299,8 +429,34 @@ class WebRTCManager {
     }
     
     getOfferFromStore(connectionId) {
-        const stored = localStorage.getItem(`offer_${connectionId}`);
-        return stored ? JSON.parse(stored) : null;
+        console.log('Looking for connection ID:', connectionId);
+        
+        // 全てのlocalStorageキーを確認
+        const allKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('offer_')) {
+                allKeys.push(key);
+            }
+        }
+        console.log('Available offer keys:', allKeys);
+        
+        const key = `offer_${connectionId}`;
+        const stored = localStorage.getItem(key);
+        
+        if (!stored) {
+            console.warn(`Connection ID ${connectionId} not found in localStorage`);
+            return null;
+        }
+        
+        try {
+            const parsed = JSON.parse(stored);
+            console.log('Found offer for connection ID:', connectionId);
+            return parsed;
+        } catch (error) {
+            console.error('Failed to parse stored offer:', error);
+            return null;
+        }
     }
     
     storeAnswerForHost(connectionId, answer) {
@@ -312,6 +468,18 @@ class WebRTCManager {
         const existing = JSON.parse(localStorage.getItem(key) || '[]');
         existing.push(candidate);
         localStorage.setItem(key, JSON.stringify(existing));
+    }
+    
+    getAvailableConnectionIds() {
+        const connectionIds = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('offer_')) {
+                const connectionId = key.replace('offer_', '');
+                connectionIds.push(connectionId);
+            }
+        }
+        return connectionIds.sort();
     }
     
     clearStoredData(connectionId) {

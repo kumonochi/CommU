@@ -1048,6 +1048,20 @@ class CommUApp {
             // 接続IDを表示
             document.getElementById('connection-id').textContent = connectionId;
             
+            // デバッグ情報として接続IDとオファー情報を表示
+            this.showDebugLog('info', `ホスト接続ID生成: ${connectionId}`);
+            this.showDebugLog('info', 'LocalStorage keys after host creation:', Object.keys(localStorage));
+            
+            // 接続IDが確実に保存されているかチェック
+            setTimeout(() => {
+                const storedOffer = localStorage.getItem(`offer_${connectionId}`);
+                if (storedOffer) {
+                    this.showDebugLog('info', 'オファーが正常に保存されました');
+                } else {
+                    this.showDebugLog('error', 'オファーの保存に失敗しました');
+                }
+            }, 1000);
+            
             // ホスト画面を表示
             document.getElementById('qr-role-selection').classList.add('hidden');
             document.getElementById('qr-host-section').classList.remove('hidden');
@@ -1159,13 +1173,37 @@ class CommUApp {
 
     // 手動接続
     async connectManually() {
-        const connectionId = document.getElementById('manual-connection-id').value.trim();
+        const connectionId = document.getElementById('manual-connection-id').value.trim().toUpperCase();
         if (!connectionId) {
             this.showMessage('接続IDを入力してください');
             return;
         }
         
-        await this.connectToQRHost(connectionId);
+        // 接続ID形式をチェック
+        if (!/^[A-Z0-9]{6}$/.test(connectionId)) {
+            this.showMessage('接続IDは6文字の英数字で入力してください');
+            return;
+        }
+        
+        this.showDebugLog('info', `手動入力による接続試行: ${connectionId}`);
+        
+        try {
+            await this.connectToQRHost(connectionId);
+        } catch (error) {
+            this.showDebugLog('error', '手動接続失敗', error);
+            
+            // 利用可能な接続IDを表示
+            if (this.webrtcManager) {
+                const availableIds = this.webrtcManager.getAvailableConnectionIds();
+                if (availableIds.length > 0) {
+                    this.showMessage(`接続失敗: ${error.message}\n\n利用可能なID: ${availableIds.join(', ')}`);
+                } else {
+                    this.showMessage(`接続失敗: ${error.message}\n\nホスト側で接続を開始してください。`);
+                }
+            } else {
+                this.showMessage(`接続失敗: ${error.message}`);
+            }
+        }
     }
 
     // メッセージ送信（統合版）

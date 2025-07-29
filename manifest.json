@@ -1,6 +1,7 @@
 {
   "name": "CommU⇆",
   "short_name": "CommU",
+  "version": "2.2.1",
   "description": "質問と4択回答でコミュニケーションを支援するアプリ",
   "start_url": "./index.html",
   "display": "standalone",
