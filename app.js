@@ -22,6 +22,7 @@ class CommUApp {
         this.messageBuffer = new Map(); // 分割メッセージのバッファ
         this.reconnectAttempts = 0; // 再接続試行回数
         this.maxReconnectAttempts = 3; // 最大再接続試行回数
+        this.debugMode = false; // デバッグモード
         
         this.init();
     }
@@ -76,6 +77,20 @@ class CommUApp {
         document.getElementById('export-csv').addEventListener('click', () => this.exportData('csv'));
         document.getElementById('export-email').addEventListener('click', () => this.exportData('email'));
         document.getElementById('skip-export').addEventListener('click', () => this.skipExport());
+
+        // デバッグ機能（隠しコマンド：タイトルを5回タップ）
+        let tapCount = 0;
+        const titleElement = document.querySelector('.app-title');
+        if (titleElement) {
+            titleElement.addEventListener('click', () => {
+                tapCount++;
+                if (tapCount >= 5) {
+                    this.toggleDebugMode();
+                    tapCount = 0;
+                }
+                setTimeout(() => { tapCount = 0; }, 2000);
+            });
+        }
     }
 
     setupNumpad() {
@@ -121,12 +136,13 @@ class CommUApp {
     async startHost() {
         try {
             this.isHost = true;
+            this.showDebugLog('info', 'ホストとして接続を開始');
             // Bluetooth接続の実装（Web Bluetooth APIを使用）
             await this.requestBluetoothDevice();
             this.showScreen('role-screen');
         } catch (error) {
-            console.error('Bluetooth host start failed:', error);
-            this.showMessage('Bluetooth接続に失敗しました');
+            this.showDebugLog('error', 'Bluetooth host start failed', error);
+            this.showMessage(`Bluetooth接続に失敗しました: ${error.message}`);
         }
     }
 
@@ -837,6 +853,58 @@ class CommUApp {
         setTimeout(() => {
             popup.remove();
         }, 10000);
+    }
+
+    // デバッグ用ログ表示機能
+    showDebugLog(level, message, data = null) {
+        // コンソールログ
+        console[level](message, data);
+        
+        // 画面上にもデバッグ情報を表示（開発モード時）
+        if (this.debugMode) {
+            const debugElement = this.getOrCreateDebugElement();
+            const logEntry = document.createElement('div');
+            logEntry.className = `debug-entry debug-${level}`;
+            logEntry.innerHTML = `
+                <span class="debug-time">${new Date().toLocaleTimeString()}</span>
+                <span class="debug-level">[${level.toUpperCase()}]</span>
+                <span class="debug-message">${message}</span>
+                ${data ? `<pre class="debug-data">${JSON.stringify(data, null, 2)}</pre>` : ''}
+            `;
+            
+            debugElement.appendChild(logEntry);
+            debugElement.scrollTop = debugElement.scrollHeight;
+            
+            // 最大50エントリーで制限
+            while (debugElement.children.length > 50) {
+                debugElement.removeChild(debugElement.firstChild);
+            }
+        }
+    }
+
+    getOrCreateDebugElement() {
+        let debugElement = document.getElementById('debug-console');
+        if (!debugElement) {
+            debugElement = document.createElement('div');
+            debugElement.id = 'debug-console';
+            debugElement.className = 'debug-console';
+            document.body.appendChild(debugElement);
+        }
+        return debugElement;
+    }
+
+    toggleDebugMode() {
+        this.debugMode = !this.debugMode;
+        const debugElement = document.getElementById('debug-console');
+        
+        if (this.debugMode) {
+            this.showDebugLog('info', 'デバッグモードを有効にしました');
+            if (debugElement) debugElement.style.display = 'block';
+        } else {
+            if (debugElement) debugElement.style.display = 'none';
+        }
+        
+        this.showMessage(`デバッグモード: ${this.debugMode ? 'ON' : 'OFF'}`);
     }
 
     // ルーム関連のイベントハンドラー
