@@ -110,7 +110,9 @@ class CommUApp {
 
         // 接続方法選択
         document.getElementById('p2p-connection').addEventListener('click', () => this.selectConnectionMethod('p2p'));
-        document.getElementById('back-to-connection').addEventListener('click', () => this.showScreen('connection-screen'));
+        
+        // キャッシュクリアボタン
+        document.getElementById('clear-cache-btn').addEventListener('click', () => this.clearCacheAndReload());
 
         // P2P接続
         document.getElementById('p2p-host-btn').addEventListener('click', () => this.startP2PHost());
@@ -932,6 +934,28 @@ class CommUApp {
         } else {
             this.showDebugLog('warn', 'メッセージ送信失敗: P2P接続なし', message);
             this.showMessage('P2P接続されていません');
+        }
+    }
+    
+    // キャッシュクリア＆再読み込み
+    clearCacheAndReload() {
+        if (confirm('🗑️ キャッシュをクリアして最新版を取得しますか？\n\nページが自動的に再読み込みされます。')) {
+            if ('caches' in window) {
+                caches.keys().then(cacheNames => {
+                    return Promise.all(
+                        cacheNames.map(cacheName => {
+                            console.log('Deleting cache:', cacheName);
+                            return caches.delete(cacheName);
+                        })
+                    );
+                }).then(() => {
+                    console.log('All caches cleared');
+                    window.location.reload(true);
+                });
+            } else {
+                // Service Workerがサポートされていない場合も再読み込み
+                window.location.reload(true);
+            }
         }
     }
 }
