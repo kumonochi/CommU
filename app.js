@@ -7,6 +7,8 @@ class CommUApp {
         this.roomChatHistory = {}; // 部屋ごとのチャット履歴を管理
         this.roomPasswords = {}; // 部屋ごとのパスワードを管理
         this.currentPassword = ''; // 現在設定中のパスワード
+        this.currentSetupPassword = ''; // パスワード設定画面での入力中パスワード
+        this.pendingRoomId = ''; // パスワード設定待ちのルームID
         this.targetRoomId = ''; // パスワード入力画面で対象となる部屋ID
         this.hasActiveQuestion = false; // 現在質問があるかどうか
         this.answerButtonTexts = {
@@ -18,6 +20,7 @@ class CommUApp {
             no: 0
         };
         this.roomParticipants = {}; // ルーム参加者管理
+        this.roomStatus = {}; // 部屋の詳細状態管理
         this.connectedDevices = []; // 接続デバイス管理
         this.isAnswererConnected = false; // 回答者接続状態
         this.messageBuffer = new Map(); // 分割メッセージのバッファ
@@ -82,6 +85,10 @@ class CommUApp {
         document.getElementById('create-room-btn').addEventListener('click', () => this.createRoom());
         document.getElementById('back-to-role-btn').addEventListener('click', () => this.showScreen('role-screen'));
         document.getElementById('back-to-role-btn2').addEventListener('click', () => this.showScreen('role-screen'));
+        
+        // パスワード設定画面
+        document.getElementById('complete-room-creation-btn').addEventListener('click', () => this.completeRoomCreation());
+        document.getElementById('back-to-room-create').addEventListener('click', () => this.showScreen('room-create-screen'));
 
         // 質問者画面
         document.getElementById('send-question-btn').addEventListener('click', () => this.sendQuestion());
@@ -173,53 +180,55 @@ class CommUApp {
             createBtn.disabled = false;
         });
         
-        // パスワード入力機能
-        this.setupPasswordInput();
+        // パスワード設定システム
+        this.setupPasswordSetup();
+        // パスワード入力システム
+        this.setupPasswordEntry();
     }
     
-    setupPasswordInput() {
-        // ルーム作成時のパスワード設定
-        const passwordBtns = document.querySelectorAll('.password-btn[data-char]');
-        const clearPasswordBtn = document.querySelector('.clear-password-btn');
-        const randomPasswordBtn = document.querySelector('.random-password-btn');
-        const createBtn = document.getElementById('create-room-btn');
+    setupPasswordSetup() {
+        // パスワード設定画面でのパスワード入力
+        const passwordSetupBtns = document.querySelectorAll('.password-setup-btn[data-char]');
+        const clearPasswordSetupBtn = document.getElementById('clear-password-setup-btn');
+        const randomPasswordSetupBtn = document.getElementById('random-password-setup-btn');
+        const completeBtn = document.getElementById('complete-room-creation-btn');
         
         let password = '';
         
-        passwordBtns.forEach(btn => {
+        passwordSetupBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (password.length < 4) {
                     password += btn.dataset.char;
-                    this.updatePasswordDisplay(password);
-                    this.checkCreateButtonState();
+                    this.updatePasswordSetupDisplay(password);
+                    this.currentSetupPassword = password;
+                    if (password.length === 4) {
+                        completeBtn.disabled = false;
+                    }
                 }
             });
         });
         
-        if (clearPasswordBtn) {
-            clearPasswordBtn.addEventListener('click', () => {
+        if (clearPasswordSetupBtn) {
+            clearPasswordSetupBtn.addEventListener('click', () => {
                 password = '';
-                this.updatePasswordDisplay('');
-                this.checkCreateButtonState();
+                this.updatePasswordSetupDisplay('');
+                this.currentSetupPassword = '';
+                completeBtn.disabled = true;
             });
         }
         
-        if (randomPasswordBtn) {
-            randomPasswordBtn.addEventListener('click', () => {
+        if (randomPasswordSetupBtn) {
+            randomPasswordSetupBtn.addEventListener('click', () => {
                 const chars = 'abcdefghi';
                 password = '';
                 for (let i = 0; i < 4; i++) {
                     password += chars[Math.floor(Math.random() * chars.length)];
                 }
-                this.updatePasswordDisplay(password);
-                this.checkCreateButtonState();
+                this.updatePasswordSetupDisplay(password);
+                this.currentSetupPassword = password;
+                completeBtn.disabled = false;
             });
         }
-        
-        this.currentPassword = password;
-        
-        // パスワード入力画面での処理
-        this.setupPasswordEntry();
     }
     
     setupPasswordEntry() {
@@ -275,13 +284,12 @@ class CommUApp {
         display.textContent = padded;
     }
     
-    updatePasswordDisplay(password) {
-        const display = document.getElementById('password-input');
+    updatePasswordSetupDisplay(password) {
+        const display = document.getElementById('password-setup-input');
         if (display) {
             const padded = password.padEnd(4, '-');
             display.textContent = padded;
         }
-        this.currentPassword = password;
     }
     
     updatePasswordEntryDisplay(password) {
@@ -292,18 +300,6 @@ class CommUApp {
         }
     }
     
-    checkCreateButtonState() {
-        const roomIdInput = document.getElementById('room-id-input');
-        const createBtn = document.getElementById('create-room-btn');
-        
-        if (roomIdInput && createBtn) {
-            const roomId = roomIdInput.textContent.replace(/-/g, '');
-            const hasValidRoomId = roomId.length === 5;
-            const hasValidPassword = this.currentPassword.length === 4;
-            
-            createBtn.disabled = !(hasValidRoomId && hasValidPassword);
-        }
-    }
 
 
 
@@ -336,6 +332,9 @@ class CommUApp {
             case 'connection_established':
                 this.handleConnectionEstablished(message.data);
                 break;
+            case 'participant_left':
+                this.handleParticipantLeft(message.data);
+                break;
         }
     }
 
@@ -359,10 +358,31 @@ class CommUApp {
 
     createRoom() {
         const roomId = document.getElementById('room-id-input').textContent.replace(/-/g, '');
-        const password = this.currentPassword;
         
-        if (roomId.length !== 5 || password.length !== 4) {
-            this.showMessage('ルームIDとパスワードを正しく入力してください');
+        if (roomId.length !== 5) {
+            this.showMessage('5桁のルームIDを入力してください');
+            return;
+        }
+        
+        // パスワード設定画面に移動
+        this.pendingRoomId = roomId;
+        document.getElementById('setup-room-id').textContent = roomId;
+        this.showScreen('password-setup-screen');
+        
+        // パスワード入力をリセット
+        this.updatePasswordSetupDisplay('');
+        const completeBtn = document.getElementById('complete-room-creation-btn');
+        if (completeBtn) {
+            completeBtn.disabled = true;
+        }
+    }
+    
+    completeRoomCreation() {
+        const roomId = this.pendingRoomId;
+        const password = this.currentSetupPassword;
+        
+        if (!roomId || roomId.length !== 5 || !password || password.length !== 4) {
+            this.showMessage('ルームIDとパスワードを正しく設定してください');
             return;
         }
         
@@ -387,6 +407,10 @@ class CommUApp {
             type: 'room_created',
             data: { roomId: roomId, creatorRole: 'questioner', password: password }
         });
+        
+        // 一時変数をクリア
+        this.pendingRoomId = null;
+        this.currentSetupPassword = '';
     }
     
     // 部屋を切り替える際のチャット履歴管理
@@ -407,36 +431,84 @@ class CommUApp {
     }
 
     showRoomList() {
-        // デモ用のルーム一覧を表示
+        this.refreshRoomList();
+        this.showScreen('room-join-screen');
+    }
+    
+    refreshRoomList() {
         const roomList = document.getElementById('room-list');
         roomList.innerHTML = '';
         
-        // 実際の実装では、利用可能なルーム一覧を取得
-        const availableRooms = ['12345', '67890', '11111'];
-        
-        availableRooms.forEach(roomId => {
-            const roomItem = document.createElement('button');
-            roomItem.className = 'room-item';
-            
-            // ルーム満員チェック
+        // 質問者が入室している部屋のみを表示（参加者数が正確に管理されている）
+        const activeRooms = Object.keys(this.roomParticipants).filter(roomId => {
             const roomInfo = this.roomParticipants[roomId];
-            const isFull = roomInfo && roomInfo.participantCount >= 2;
-            
-            if (isFull) {
-                roomItem.textContent = `ルーム ${roomId} (満席)`;
-                roomItem.disabled = true;
-                roomItem.style.backgroundColor = '#f5f5f5';
-                roomItem.style.color = '#999';
-                roomItem.addEventListener('click', () => this.showMessage('満席です'));
-            } else {
-                roomItem.textContent = `ルーム ${roomId}`;
-                roomItem.addEventListener('click', () => this.showPasswordScreen(roomId));
-            }
-            
-            roomList.appendChild(roomItem);
+            return roomInfo && roomInfo.questioner && roomInfo.questioner.connected && roomInfo.participantCount > 0;
         });
         
-        this.showScreen('room-join-screen');
+        if (activeRooms.length === 0) {
+            const noRoomsMessage = document.createElement('div');
+            noRoomsMessage.className = 'no-rooms-message';
+            noRoomsMessage.textContent = '現在利用可能な部屋がありません';
+            noRoomsMessage.style.cssText = 'text-align: center; padding: 20px; color: #999; font-style: italic;';
+            roomList.appendChild(noRoomsMessage);
+        } else {
+            activeRooms.forEach(roomId => {
+                const roomItem = document.createElement('button');
+                roomItem.className = 'room-item';
+                roomItem.style.cssText = 'width: 100%; padding: 15px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; text-align: left;';
+                
+                // ルーム満員チェック
+                const roomInfo = this.roomParticipants[roomId];
+                const isFull = roomInfo && roomInfo.participantCount >= 2;
+                
+                if (isFull) {
+                    roomItem.textContent = `ルーム ${roomId} (満席)`;
+                    roomItem.disabled = true;
+                    roomItem.style.backgroundColor = '#f5f5f5';
+                    roomItem.style.color = '#999';
+                    roomItem.addEventListener('click', () => this.showMessage('満席です'));
+                } else {
+                    roomItem.textContent = `ルーム ${roomId} (参加者: ${roomInfo.participantCount}/2)`;
+                    roomItem.addEventListener('click', () => this.showPasswordScreen(roomId));
+                    
+                    // ホバー効果
+                    roomItem.addEventListener('mouseenter', () => {
+                        roomItem.style.backgroundColor = '#f0f0f0';
+                    });
+                    roomItem.addEventListener('mouseleave', () => {
+                        roomItem.style.backgroundColor = 'white';
+                    });
+                }
+                
+                roomList.appendChild(roomItem);
+            });
+        }
+        
+        // 再読み込みボタンを追加
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = '🔄 再読込';
+        refreshBtn.className = 'refresh-btn';
+        refreshBtn.title = '最新の部屋情報を読み込みます';
+        refreshBtn.style.cssText = 'padding: 8px 16px; margin: 10px auto; display: block; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; color: #666; cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease;';
+        refreshBtn.addEventListener('click', () => {
+            refreshBtn.textContent = '🔄 読み込み中...';
+            refreshBtn.disabled = true;
+            setTimeout(() => {
+                this.refreshRoomList();
+                refreshBtn.textContent = '🔄 再読込';
+                refreshBtn.disabled = false;
+            }, 500);
+        });
+        
+        // ホバー効果
+        refreshBtn.addEventListener('mouseenter', () => {
+            refreshBtn.style.backgroundColor = '#e8e8e8';
+        });
+        refreshBtn.addEventListener('mouseleave', () => {
+            refreshBtn.style.backgroundColor = '#f8f8f8';
+        });
+        
+        roomList.appendChild(refreshBtn);
     }
     
     showPasswordScreen(roomId) {
@@ -787,6 +859,30 @@ class CommUApp {
     }
 
     exitRoom(role) {
+        // ルーム退出時に参加者情報を更新
+        if (this.currentRoom && this.roomParticipants[this.currentRoom]) {
+            if (role === 'questioner') {
+                this.roomParticipants[this.currentRoom].questioner = null;
+                this.roomParticipants[this.currentRoom].participantCount--;
+            } else if (role === 'answerer') {
+                this.roomParticipants[this.currentRoom].answerer = null;
+                this.roomParticipants[this.currentRoom].participantCount--;
+            }
+            
+            // 参加者がいなくなったらルーム情報を削除
+            if (this.roomParticipants[this.currentRoom].participantCount <= 0) {
+                delete this.roomParticipants[this.currentRoom];
+                delete this.roomPasswords[this.currentRoom];
+                delete this.roomChatHistory[this.currentRoom];
+            }
+            
+            // 退出をP2P経由で通知
+            this.sendMessage({
+                type: 'participant_left',
+                data: { roomId: this.currentRoom, role: role }
+            });
+        }
+        
         if (role === 'questioner' && this.chatHistory.length > 0) {
             this.showExportModal();
         } else {
@@ -979,6 +1075,35 @@ class CommUApp {
         console.log('Connection established with device:', data.deviceId);
         this.connectedDevices.push(data.deviceId);
         this.reconnectAttempts = 0; // 再接続カウンターをリセット
+    }
+
+    handleParticipantLeft(data) {
+        if (data.roomId && this.roomParticipants[data.roomId]) {
+            if (data.role === 'questioner') {
+                this.roomParticipants[data.roomId].questioner = null;
+                this.roomParticipants[data.roomId].participantCount--;
+                if (this.currentRole === 'answerer' && this.currentRoom === data.roomId) {
+                    this.showMessage('質問者が退出しました');
+                    this.resetQuestion();
+                }
+            } else if (data.role === 'answerer') {
+                this.roomParticipants[data.roomId].answerer = null;
+                this.roomParticipants[data.roomId].participantCount--;
+                if (this.currentRole === 'questioner' && this.currentRoom === data.roomId) {
+                    this.showMessage('回答者が退出しました');
+                    this.isAnswererConnected = false;
+                    document.getElementById('waiting-message').classList.remove('hidden');
+                    document.getElementById('questioner-content').classList.add('hidden');
+                }
+            }
+            
+            // 参加者がいなくなったらルーム情報を削除
+            if (this.roomParticipants[data.roomId].participantCount <= 0) {
+                delete this.roomParticipants[data.roomId];
+                delete this.roomPasswords[data.roomId];
+                delete this.roomChatHistory[data.roomId];
+            }
+        }
     }
 
 
