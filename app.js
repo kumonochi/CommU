@@ -665,7 +665,7 @@ class CommUApp {
         
         setTimeout(() => {
             popup.remove();
-        }, 10000);
+        }, 3000);
     }
 
     // デバッグ用ログ表示機能
@@ -1133,9 +1133,12 @@ class CommUApp {
         // 回答ボタンを無効化
         this.disableAnswerButtons();
         
-        // 待機画面を表示
+        // 待機画面を表示し、メッセージ送信機能は維持
         document.getElementById('waiting-question').classList.remove('hidden');
-        document.getElementById('answerer-content').classList.add('hidden');
+        document.getElementById('answerer-content').classList.remove('hidden');
+        
+        // メッセージ送信機能を有効に保つ
+        this.enableMessageSending();
     }
 }
 
