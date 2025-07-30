@@ -30,7 +30,8 @@ class CommUApp {
         this.connectionMethod = 'p2p'; // P2P通信のみ
         this.p2pManager = null; // P2P接続管理
         this.peerDiscovery = null; // ピア検索機能
-        this.qrScanner = null; // QRスキャナー
+        this.qrScanRunning = false; // QRスキャン実行状態
+        this.qrStream = null; // カメラストリーム
         
         this.init();
     }
@@ -1344,8 +1345,8 @@ class CommUApp {
     // QRスキャン開始
     async startQRScan() {
         try {
-            // QrScannerライブラリが読み込まれているかチェック
-            if (typeof QrScanner === 'undefined') {
+            // jsQRライブラリが読み込まれているかチェック
+            if (typeof jsQR === 'undefined') {
                 this.showMessage('QRスキャナーライブラリが読み込まれていません。少し待ってから再試行してください。');
                 return;
             }
@@ -1355,29 +1356,58 @@ class CommUApp {
             const scanBtn = document.getElementById('scan-qr-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
             
-            // QRスキャナーを初期化
-            this.qrScanner = new QrScanner(video, (result) => {
-                // QRコードが読み取れた場合
-                const peerIdInput = document.getElementById('peer-id-input');
-                peerIdInput.value = result.data;
-                
-                this.showMessage('QRコードを読み取りました！');
-                this.stopQRScan();
-                
-                // 自動的に接続を開始
-                setTimeout(() => {
-                    this.connectToPeer();
-                }, 1000);
-            }, {
-                highlightScanRegion: true,
-                highlightCodeOutline: true,
+            // カメラストリームを取得
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment' } 
             });
             
-            await this.qrScanner.start();
+            video.srcObject = stream;
+            video.setAttribute('playsinline', true);
+            video.play();
             
             scanContainer.classList.remove('hidden');
             scanBtn.classList.add('hidden');
             stopBtn.classList.remove('hidden');
+            
+            // キャンバスを作成してQRコードを検出
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            const scanQRCode = () => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: 'dontInvert',
+                    });
+                    
+                    if (code) {
+                        // QRコードが読み取れた場合
+                        const peerIdInput = document.getElementById('peer-id-input');
+                        peerIdInput.value = code.data;
+                        
+                        this.showMessage('QRコードを読み取りました！');
+                        this.stopQRScan();
+                        
+                        // 自動的に接続を開始
+                        setTimeout(() => {
+                            this.connectToPeer();
+                        }, 1000);
+                        return;
+                    }
+                }
+                
+                if (this.qrScanRunning) {
+                    requestAnimationFrame(scanQRCode);
+                }
+            };
+            
+            this.qrScanRunning = true;
+            this.qrStream = stream;
+            requestAnimationFrame(scanQRCode);
             
         } catch (error) {
             console.error('QRスキャン開始エラー:', error);
@@ -1387,10 +1417,16 @@ class CommUApp {
     
     // QRスキャン停止
     stopQRScan() {
-        if (this.qrScanner) {
-            this.qrScanner.stop();
-            this.qrScanner.destroy();
-            this.qrScanner = null;
+        this.qrScanRunning = false;
+        
+        if (this.qrStream) {
+            this.qrStream.getTracks().forEach(track => track.stop());
+            this.qrStream = null;
+        }
+        
+        const video = document.getElementById('qr-video');
+        if (video.srcObject) {
+            video.srcObject = null;
         }
         
         const scanContainer = document.getElementById('qr-scanner-container');
