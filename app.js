@@ -94,13 +94,12 @@ class CommUApp {
         document.getElementById('send-text-answer-btn').addEventListener('click', () => this.sendTextAnswer());
         document.getElementById('exit-room-btn-answerer').addEventListener('click', () => this.exitRoom('answerer'));
 
-        // カスタマイズボタン
-        document.getElementById('customize-yes').addEventListener('click', () => this.showCustomizeModal('yes'));
-        document.getElementById('customize-no').addEventListener('click', () => this.showCustomizeModal('no'));
-        document.getElementById('close-customize').addEventListener('click', () => this.hideCustomizeModal());
+        // 回答変更ボタン
+        document.getElementById('change-yes').addEventListener('click', () => this.changeAnswerText('yes'));
+        document.getElementById('change-no').addEventListener('click', () => this.changeAnswerText('no'));
 
         // 音響モード
-        document.getElementById('back-from-sound').addEventListener('click', () => this.showScreen('role-screen'));
+        document.getElementById('back-from-sound').addEventListener('click', () => this.showScreen('connection-screen'));
         document.querySelectorAll('.sound-answer-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.playSoundAnswer(e.target.dataset.answer));
         });
@@ -113,6 +112,10 @@ class CommUApp {
 
         // 接続方法選択
         document.getElementById('p2p-connection').addEventListener('click', () => this.selectConnectionMethod('p2p'));
+        document.getElementById('sound-mode-connection').addEventListener('click', () => this.showScreen('sound-mode-screen'));
+        
+        // 接続解除ボタン
+        document.getElementById('disconnect-btn').addEventListener('click', () => this.confirmDisconnect());
         
         // キャッシュクリアボタン
         document.getElementById('clear-cache-btn').addEventListener('click', () => this.clearCacheAndReload());
@@ -169,6 +172,9 @@ class CommUApp {
             case 'participant_left':
                 this.handleParticipantLeft(message.data);
                 break;
+            case 'disconnect_notification':
+                this.handleDisconnectNotification(message.data);
+                break;
         }
     }
 
@@ -183,9 +189,6 @@ class CommUApp {
                 break;
             case 'answerer':
                 this.startAsAnswerer();
-                break;
-            case 'sound':
-                this.showScreen('sound-mode-screen');
                 break;
         }
     }
@@ -245,10 +248,12 @@ class CommUApp {
         
         document.getElementById('current-room-id-answerer').textContent = peerId;
         this.showScreen('answerer-screen');
-        document.getElementById('answerer-content').classList.remove('hidden');
         
-        // 初期状態では回答ボタンを無効化
+        // 質問が来るまではメッセージ送信は有効、回答ボタンは無効
+        document.getElementById('answerer-content').classList.remove('hidden');
+        document.getElementById('waiting-question').classList.remove('hidden');
         this.disableAnswerButtons();
+        this.enableMessageSending();
         
         // 質問者に参加通知を送信
         this.sendMessage({
@@ -458,36 +463,16 @@ class CommUApp {
         historyElement.scrollTop = historyElement.scrollHeight;
     }
 
-    showCustomizeModal(buttonType) {
-        const modal = document.getElementById('customize-modal');
-        const title = document.getElementById('customize-title');
-        const options = document.querySelectorAll('.customize-option');
-
-        title.textContent = `「${buttonType === 'yes' ? 'はい' : 'いいえ'}」ボタンをカスタマイズ`;
+    // 回答テキストを変更
+    changeAnswerText(buttonType) {
+        // 次のテキストに切り替え
+        this.currentAnswerIndex[buttonType] = (this.currentAnswerIndex[buttonType] + 1) % this.answerButtonTexts[buttonType].length;
         
-        const texts = this.answerButtonTexts[buttonType];
-        options.forEach((option, index) => {
-            option.textContent = texts[index];
-            option.dataset.value = index;
-            option.onclick = () => this.selectCustomOption(buttonType, index);
-        });
-
-        modal.classList.add('active');
-    }
-
-    selectCustomOption(buttonType, index) {
-        this.currentAnswerIndex[buttonType] = index;
+        // ボタンのテキストを更新
         const buttonElement = document.getElementById(`answer-${buttonType}`);
-        buttonElement.textContent = this.answerButtonTexts[buttonType][index];
+        buttonElement.textContent = this.answerButtonTexts[buttonType][this.currentAnswerIndex[buttonType]];
         
-        const customizeButton = document.getElementById(`customize-${buttonType}`);
-        customizeButton.textContent = this.answerButtonTexts[buttonType][index];
-        
-        this.hideCustomizeModal();
-    }
-
-    hideCustomizeModal() {
-        document.getElementById('customize-modal').classList.remove('active');
+        this.showMessage(`「${buttonType === 'yes' ? 'はい' : 'いいえ'}」ボタンを「${this.answerButtonTexts[buttonType][this.currentAnswerIndex[buttonType]]}」に変更しました`);
     }
 
     playSoundEffect(soundType) {
@@ -782,6 +767,11 @@ class CommUApp {
         }
     }
 
+    handleDisconnectNotification(data) {
+        this.showMessage(data.message);
+        this.disconnectAndReturnToTitle();
+    }
+
 
 
 
@@ -958,6 +948,56 @@ class CommUApp {
         this.showMessage('P2P接続をキャンセルしました');
     }
 
+    // 接続解除確認
+    confirmDisconnect() {
+        if (confirm('P2P接続を解除してタイトルに戻りますか？')) {
+            this.disconnectAndReturnToTitle();
+        }
+    }
+
+    // 接続解除してタイトルに戻る
+    disconnectAndReturnToTitle() {
+        this.showDebugLog('info', 'P2P接続を解除してタイトルに戻る');
+        
+        // 相手に切断通知を送信
+        if (this.p2pManager && this.p2pManager.connection) {
+            try {
+                this.sendMessage({
+                    type: 'disconnect_notification',
+                    data: { message: '相手が接続を解除しました' }
+                });
+            } catch (error) {
+                this.showDebugLog('warn', '切断通知送信失敗:', error);
+            }
+        }
+        
+        // P2P接続を破棄
+        if (this.p2pManager) {
+            try {
+                if (this.p2pManager.peer) {
+                    this.p2pManager.peer.destroy();
+                }
+                if (this.p2pManager.connection) {
+                    this.p2pManager.connection.close();
+                }
+            } catch (error) {
+                this.showDebugLog('warn', 'P2P接続破棄時のエラー:', error);
+            }
+            this.p2pManager = null;
+        }
+        
+        // 状態をリセット
+        this.currentRole = null;
+        this.currentRoom = null;
+        this.chatHistory = [];
+        this.roomParticipants = {};
+        this.roomChatHistory = {};
+        
+        // 接続画面に戻る
+        this.showScreen('connection-screen');
+        this.showMessage('接続を解除しました');
+    }
+
     // メッセージ送信（P2Pのみ）
     async sendMessage(message) {
         if (this.connectionMethod === 'p2p' && this.p2pManager) {
@@ -1026,6 +1066,16 @@ class CommUApp {
             textAnswerBtn.disabled = false;
             textAnswerBtn.style.opacity = '1';
         }
+        
+        // 変更ボタンも有効化
+        const changeButtons = ['change-yes', 'change-no'];
+        changeButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.disabled = false;
+                button.style.opacity = '1';
+            }
+        });
     }
     
     // 回答ボタンを無効化
@@ -1043,6 +1093,31 @@ class CommUApp {
         if (textAnswerBtn) {
             textAnswerBtn.disabled = true;
             textAnswerBtn.style.opacity = '0.5';
+        }
+        
+        // 変更ボタンも無効化
+        const changeButtons = ['change-yes', 'change-no'];
+        changeButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.disabled = true;
+                button.style.opacity = '0.5';
+            }
+        });
+    }
+    
+    // メッセージ送信を有効化
+    enableMessageSending() {
+        const messageBtn = document.getElementById('send-message-btn');
+        const messageInput = document.getElementById('free-message-input');
+        
+        if (messageBtn) {
+            messageBtn.disabled = false;
+            messageBtn.style.opacity = '1';
+        }
+        if (messageInput) {
+            messageInput.disabled = false;
+            messageInput.style.opacity = '1';
         }
     }
     

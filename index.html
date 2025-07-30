@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234CAF50'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='12' text-anchor='middle' fill='white'%3EC%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.4.1">
+    <link rel="stylesheet" href="styles.css?v=2.4.2">
     
     <!-- キャッシュ制御用メタタグ -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -29,7 +29,7 @@
                 <h1 class="app-title">CommU⇆</h1>
                 <p class="subtitle">接続方法を選んでください</p>
                 <div class="version-info">
-                    <span>バージョン: </span><span id="app-version">2.4.1</span>
+                    <span>バージョン: </span><span id="app-version">2.4.2</span>
                     <span class="version-status" id="version-status">確認中...</span>
                 </div>
                 
@@ -38,6 +38,11 @@
                         <div class="method-icon">🌐</div>
                         <span class="method-title">デバイス間通信開始</span>
                         <span class="method-desc">インターネット経由のP2P接続</span>
+                    </button>
+                    <button class="connection-method-btn sound-btn" id="sound-mode-connection">
+                        <div class="method-icon">🔊</div>
+                        <span class="method-title">言葉で質問・音で回答</span>
+                        <span class="method-desc">単体デバイスでの音響モード</span>
                     </button>
                 </div>
                 
@@ -99,10 +104,9 @@
                         <div class="role-icon">💭</div>
                         <span>答える人になる</span>
                     </button>
-                    <button class="role-btn sound-btn" id="sound-role">
-                        <div class="role-icon">🔊</div>
-                        <span>言葉で質問・音で回答</span>
-                    </button>
+                </div>
+                <div style="text-align: center; margin-top: 30px;">
+                    <button class="secondary-btn" id="disconnect-btn" style="padding: 8px 16px; border-radius: 8px; background: #f44336; color: white; border: 1px solid #d32f2f; cursor: pointer;">接続を解除</button>
                 </div>
             </div>
         </div>
@@ -169,10 +173,6 @@
                     </div>
 
                     <div class="answer-section">
-                        <div class="answer-customize">
-                            <button class="customize-btn" id="customize-yes">はい</button>
-                            <button class="customize-btn" id="customize-no">いいえ</button>
-                        </div>
                         
                         <div class="sound-selector">
                             <label>効果音:</label>
@@ -187,8 +187,14 @@
                         </div>
 
                         <div class="answer-buttons">
-                            <button class="answer-btn yes-btn" id="answer-yes">はい</button>
-                            <button class="answer-btn no-btn" id="answer-no">いいえ</button>
+                            <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 10px;">
+                                <button class="answer-btn yes-btn" id="answer-yes">はい</button>
+                                <button class="secondary-btn" id="change-yes" style="padding: 5px 10px; border-radius: 6px; font-size: 0.8rem;">変更</button>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 10px;">
+                                <button class="answer-btn no-btn" id="answer-no">いいえ</button>
+                                <button class="secondary-btn" id="change-no" style="padding: 5px 10px; border-radius: 6px; font-size: 0.8rem;">変更</button>
+                            </div>
                             <button class="answer-btn maybe-btn" id="answer-maybe">わからない</button>
                             <button class="answer-btn refuse-btn" id="answer-refuse">答えたくない</button>
                         </div>
@@ -277,7 +283,7 @@
                 // バージョン情報を取得
                 const messageChannel = new MessageChannel();
                 messageChannel.port1.onmessage = function(event) {
-                    const currentVersion = '2.4.1';
+                    const currentVersion = '2.4.2';
                     const swVersion = event.data.version;
                     const versionStatus = document.getElementById('version-status');
                     
@@ -306,7 +312,7 @@
     <!-- PeerJS ライブラリ（P2P通信用） -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     
-    <script src="p2p-utils.js?v=2.4.1"></script>
-    <script src="app.js?v=2.4.1"></script>
+    <script src="p2p-utils.js?v=2.4.2"></script>
+    <script src="app.js?v=2.4.2"></script>
 </body>
 </html>
