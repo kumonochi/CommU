@@ -1,5 +1,5 @@
-const CACHE_NAME = 'commu-v2.4.7';
-const APP_VERSION = '2.4.7';
+const CACHE_NAME = 'commu-v2.4.8';
+const APP_VERSION = '2.4.8';
 
 // バージョン更新時に古いキャッシュを削除
 const urlsToCache = [

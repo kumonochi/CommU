@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234CAF50'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='12' text-anchor='middle' fill='white'%3EC%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.4.7">
+    <link rel="stylesheet" href="styles.css?v=2.4.8">
     
     <!-- キャッシュ制御用メタタグ -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -28,6 +28,9 @@
             <div class="container">
                 <h1 class="app-title">CommU⇆</h1>
                 <p class="subtitle">接続方法を選んでください</p>
+                <div class="version-info">
+                    <span>バージョン: </span><span id="app-version">2.4.8</span>
+                </div>
                 
                 <div class="connection-methods">
                     <button class="connection-method-btn p2p-btn" id="p2p-connection">
@@ -66,6 +69,13 @@
                                 <div class="peer-id-box" style="padding: 12px; background: #f5f5f5; border: 2px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 16px; font-weight: bold; letter-spacing: 1px;">
                                     <span id="peer-id"></span>
                                 </div>
+                                <div style="margin-top: 10px;">
+                                    <button class="primary-btn" id="show-qr-btn" style="padding: 8px 16px; font-size: 0.9rem;">📱 QRコードで表示</button>
+                                    <button class="secondary-btn hidden" id="hide-qr-btn" style="padding: 8px 16px; font-size: 0.9rem; margin-left: 8px;">QRコードを隠す</button>
+                                </div>
+                                <div id="qr-code-container" class="hidden" style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border: 2px solid #ddd;">
+                                    <canvas id="qr-canvas" style="max-width: 200px; height: auto;"></canvas>
+                                </div>
                             </div>
                             <p class="status-text" id="host-status" style="color: #666; font-style: italic;">相手の接続を待っています...</p>
                         </div>
@@ -91,6 +101,14 @@
                                 <div class="peer-input-container" style="display: flex; gap: 10px; align-items: center; justify-content: center; max-width: 400px; margin: 0 auto;">
                                     <input type="text" id="peer-id-input" placeholder="質問者のピアIDを入力" style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 16px;">
                                     <button class="primary-btn" id="connect-peer-btn" style="padding: 12px 20px; white-space: nowrap;">接続</button>
+                                </div>
+                                <div style="margin-top: 10px;">
+                                    <button class="secondary-btn" id="scan-qr-btn" style="padding: 8px 16px; font-size: 0.9rem;">📷 QRコードで読み取り</button>
+                                    <button class="secondary-btn hidden" id="stop-scan-btn" style="padding: 8px 16px; font-size: 0.9rem; margin-left: 8px;">読み取り停止</button>
+                                </div>
+                                <div id="qr-scanner-container" class="hidden" style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border: 2px solid #ddd;">
+                                    <video id="qr-video" style="width: 100%; max-width: 300px; height: auto; border-radius: 4px;"></video>
+                                    <p style="margin-top: 10px; font-size: 0.9rem; color: #666;">QRコードをカメラに向けてください</p>
                                 </div>
                             </div>
                             <p class="status-text" id="client-status" style="color: #666; font-style: italic;">質問者から教えてもらったピアIDを入力してください</p>
@@ -317,7 +335,13 @@
     <!-- PeerJS ライブラリ（P2P通信用） -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     
-    <script src="p2p-utils.js?v=2.4.7"></script>
-    <script src="app.js?v=2.4.7"></script>
+    <!-- QRコード生成ライブラリ -->
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    
+    <!-- QRコード読み取りライブラリ -->
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    
+    <script src="p2p-utils.js?v=2.4.8"></script>
+    <script src="app.js?v=2.4.8"></script>
 </body>
 </html>

@@ -30,6 +30,7 @@ class CommUApp {
         this.connectionMethod = 'p2p'; // P2P通信のみ
         this.p2pManager = null; // P2P接続管理
         this.peerDiscovery = null; // ピア検索機能
+        this.qrScanner = null; // QRスキャナー
         
         this.init();
     }
@@ -37,6 +38,7 @@ class CommUApp {
     init() {
         this.setupEventListeners();
         this.setupBroadcastChannel();
+        this.initializeSpeechSynthesis();
         this.showScreen('connection-screen');
     }
     
@@ -128,6 +130,12 @@ class CommUApp {
         // P2P接続キャンセル
         document.getElementById('cancel-host-btn').addEventListener('click', () => this.cancelP2PConnection());
         document.getElementById('cancel-client-btn').addEventListener('click', () => this.cancelP2PConnection());
+        
+        // QRコード機能
+        document.getElementById('show-qr-btn').addEventListener('click', () => this.showQRCode());
+        document.getElementById('hide-qr-btn').addEventListener('click', () => this.hideQRCode());
+        document.getElementById('scan-qr-btn').addEventListener('click', () => this.startQRScan());
+        document.getElementById('stop-scan-btn').addEventListener('click', () => this.stopQRScan());
 
         // デバッグ機能（隠しコマンド：タイトルを5回タップ）
         let tapCount = 0;
@@ -542,7 +550,45 @@ class CommUApp {
             
             const utterance = new SpeechSynthesisUtterance(texts[answerType]);
             utterance.lang = 'ja-JP';
+            
+            // より自然で滑らかな音声設定
+            utterance.rate = 0.9; // 話速を少し遅く（0.1-10、デフォルト1）
+            utterance.pitch = 1.1; // 音の高さを少し高く（0-2、デフォルト1）
+            utterance.volume = 0.8; // 音量を少し下げる（0-1、デフォルト1）
+            
+            // 利用可能な日本語音声を探す
+            const voices = speechSynthesis.getVoices();
+            const japaneseVoice = voices.find(voice => 
+                voice.lang.includes('ja') && 
+                (voice.name.includes('Google') || voice.name.includes('Microsoft') || voice.name.includes('Apple'))
+            );
+            
+            if (japaneseVoice) {
+                utterance.voice = japaneseVoice;
+            }
+            
             speechSynthesis.speak(utterance);
+        }
+    }
+    
+    // 音声合成の初期化
+    initializeSpeechSynthesis() {
+        if ('speechSynthesis' in window) {
+            // 音声リストの読み込みを待つ
+            const loadVoices = () => {
+                const voices = speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    this.showDebugLog('info', `音声合成初期化完了。利用可能な音声数: ${voices.length}`);
+                } else {
+                    setTimeout(loadVoices, 100);
+                }
+            };
+            
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = loadVoices;
+            } else {
+                loadVoices();
+            }
         }
     }
 
@@ -705,6 +751,7 @@ class CommUApp {
         // 画面上にもデバッグ情報を表示（開発モード時）
         if (this.debugMode) {
             const debugElement = this.getOrCreateDebugElement();
+            const contentArea = debugElement.querySelector('#debug-content');
             const logEntry = document.createElement('div');
             logEntry.className = `debug-entry debug-${level}`;
             logEntry.innerHTML = `
@@ -714,12 +761,12 @@ class CommUApp {
                 ${data ? `<pre class="debug-data">${JSON.stringify(data, null, 2)}</pre>` : ''}
             `;
             
-            debugElement.appendChild(logEntry);
-            debugElement.scrollTop = debugElement.scrollHeight;
+            contentArea.appendChild(logEntry);
+            contentArea.scrollTop = contentArea.scrollHeight;
             
             // 最大50エントリーで制限
-            while (debugElement.children.length > 50) {
-                debugElement.removeChild(debugElement.firstChild);
+            while (contentArea.children.length > 50) {
+                contentArea.removeChild(contentArea.firstChild);
             }
         }
     }
@@ -730,6 +777,38 @@ class CommUApp {
             debugElement = document.createElement('div');
             debugElement.id = 'debug-console';
             debugElement.className = 'debug-console';
+            
+            // トグルボタンを作成
+            const toggleButton = document.createElement('button');
+            toggleButton.id = 'debug-toggle-btn';
+            toggleButton.textContent = '－';
+            toggleButton.style.cssText = `
+                position: absolute;
+                top: 5px;
+                right: 10px;
+                background: #333;
+                color: #fff;
+                border: 1px solid #555;
+                padding: 2px 8px;
+                cursor: pointer;
+                font-size: 12px;
+                border-radius: 3px;
+                z-index: 10000;
+            `;
+            toggleButton.addEventListener('click', () => this.toggleDebugConsole());
+            
+            // コンテンツエリアを作成
+            const contentArea = document.createElement('div');
+            contentArea.id = 'debug-content';
+            contentArea.style.cssText = `
+                height: calc(100% - 30px);
+                overflow-y: auto;
+                padding: 10px;
+                padding-top: 25px;
+            `;
+            
+            debugElement.appendChild(toggleButton);
+            debugElement.appendChild(contentArea);
             document.body.appendChild(debugElement);
         }
         return debugElement;
@@ -753,6 +832,25 @@ class CommUApp {
         }
         
         this.showMessage(`デバッグモード: ${this.debugMode ? 'ON' : 'OFF'}`);
+    }
+    
+    // デバッグコンソールの表示/非表示をトグル
+    toggleDebugConsole() {
+        const debugElement = document.getElementById('debug-console');
+        const contentArea = debugElement.querySelector('#debug-content');
+        const toggleButton = debugElement.querySelector('#debug-toggle-btn');
+        
+        if (contentArea.style.display === 'none') {
+            // 表示する
+            contentArea.style.display = 'block';
+            debugElement.style.height = '200px';
+            toggleButton.textContent = '－';
+        } else {
+            // 隠す
+            contentArea.style.display = 'none';
+            debugElement.style.height = '30px';
+            toggleButton.textContent = '＋';
+        }
     }
 
 
@@ -1192,6 +1290,104 @@ class CommUApp {
         
         // メッセージ送信機能を有効に保つ
         this.enableMessageSending();
+    }
+    
+    // QRコード表示
+    showQRCode() {
+        const peerIdElement = document.getElementById('peer-id');
+        const qrContainer = document.getElementById('qr-code-container');
+        const showBtn = document.getElementById('show-qr-btn');
+        const hideBtn = document.getElementById('hide-qr-btn');
+        const canvas = document.getElementById('qr-canvas');
+        
+        if (peerIdElement && peerIdElement.textContent) {
+            const peerId = peerIdElement.textContent;
+            
+            // QRコードを生成
+            QRCode.toCanvas(canvas, peerId, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, (error) => {
+                if (error) {
+                    console.error('QRコード生成エラー:', error);
+                    this.showMessage('QRコードの生成に失敗しました');
+                } else {
+                    qrContainer.classList.remove('hidden');
+                    showBtn.classList.add('hidden');
+                    hideBtn.classList.remove('hidden');
+                }
+            });
+        }
+    }
+    
+    // QRコードを隠す
+    hideQRCode() {
+        const qrContainer = document.getElementById('qr-code-container');
+        const showBtn = document.getElementById('show-qr-btn');
+        const hideBtn = document.getElementById('hide-qr-btn');
+        
+        qrContainer.classList.add('hidden');
+        showBtn.classList.remove('hidden');
+        hideBtn.classList.add('hidden');
+    }
+    
+    // QRスキャン開始
+    async startQRScan() {
+        try {
+            const video = document.getElementById('qr-video');
+            const scanContainer = document.getElementById('qr-scanner-container');
+            const scanBtn = document.getElementById('scan-qr-btn');
+            const stopBtn = document.getElementById('stop-scan-btn');
+            
+            // QRスキャナーを初期化
+            this.qrScanner = new QrScanner(video, (result) => {
+                // QRコードが読み取れた場合
+                const peerIdInput = document.getElementById('peer-id-input');
+                peerIdInput.value = result.data;
+                
+                this.showMessage('QRコードを読み取りました！');
+                this.stopQRScan();
+                
+                // 自動的に接続を開始
+                setTimeout(() => {
+                    this.connectToPeer();
+                }, 1000);
+            }, {
+                highlightScanRegion: true,
+                highlightCodeOutline: true,
+            });
+            
+            await this.qrScanner.start();
+            
+            scanContainer.classList.remove('hidden');
+            scanBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+            
+        } catch (error) {
+            console.error('QRスキャン開始エラー:', error);
+            this.showMessage('カメラの起動に失敗しました。カメラの許可を確認してください。');
+        }
+    }
+    
+    // QRスキャン停止
+    stopQRScan() {
+        if (this.qrScanner) {
+            this.qrScanner.stop();
+            this.qrScanner.destroy();
+            this.qrScanner = null;
+        }
+        
+        const scanContainer = document.getElementById('qr-scanner-container');
+        const scanBtn = document.getElementById('scan-qr-btn');
+        const stopBtn = document.getElementById('stop-scan-btn');
+        
+        scanContainer.classList.add('hidden');
+        scanBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
     }
 }
 
