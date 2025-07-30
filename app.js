@@ -122,6 +122,10 @@ class CommUApp {
         document.getElementById('p2p-connect-btn').addEventListener('click', () => this.showP2PConnect());
         document.getElementById('back-from-p2p').addEventListener('click', () => this.showScreen('connection-screen'));
         document.getElementById('connect-peer-btn').addEventListener('click', () => this.connectToPeer());
+        
+        // P2P接続キャンセル
+        document.getElementById('cancel-host-btn').addEventListener('click', () => this.cancelP2PConnection());
+        document.getElementById('cancel-client-btn').addEventListener('click', () => this.cancelP2PConnection());
 
         // デバッグ機能（隠しコマンド：タイトルを5回タップ）
         let tapCount = 0;
@@ -186,50 +190,73 @@ class CommUApp {
         }
     }
 
-    async startAsQuestioner() {
-        try {
-            // P2Pホストとして開始
-            if (!this.p2pManager) {
-                this.p2pManager = new P2PManager();
-                this.p2pManager.onMessage = (message) => this.processMessage(message);
-                this.p2pManager.onConnectionChange = (state, error) => this.handleP2PConnectionChange(state, error);
-            }
-            
-            const peerId = await this.p2pManager.createHost();
-            
-            // ピアIDをルームIDとして使用
-            this.currentRoom = peerId;
-            
-            // ルーム参加者を初期化（質問者として登録）
-            this.roomParticipants[peerId] = {
-                questioner: { deviceId: 'host', connected: true },
-                answerer: null,
-                participantCount: 1
-            };
-            
-            document.getElementById('current-room-id').textContent = peerId;
-            this.showScreen('questioner-screen');
-            
-            this.showMessage(`ルーム開始\nピアID: ${peerId}\n回答者の接続を待っています`);
-            
-        } catch (error) {
-            this.showMessage(`ルーム開始に失敗しました: ${error.message}`);
-            this.showScreen('role-screen');
-        }
+    selectConnectionRole() {
+        // P2P接続の役割を選択（接続確立前）
+        this.showScreen('p2p-screen');
+        document.getElementById('p2p-role-selection').classList.remove('hidden');
+        document.getElementById('p2p-host-section').classList.add('hidden');
+        document.getElementById('p2p-client-section').classList.add('hidden');
     }
 
-    startAsAnswerer() {
-        // 接続先のピアIDを入力する画面を表示
-        this.showScreen('p2p-screen');
-        document.getElementById('p2p-role-selection').classList.add('hidden');
-        document.getElementById('p2p-client-section').classList.remove('hidden');
-        
-        // 入力フィールドにフォーカス
-        const peerIdInput = document.getElementById('peer-id-input');
-        if (peerIdInput) {
-            peerIdInput.focus();
-            peerIdInput.placeholder = '質問者のピアIDを入力してください';
+    // 質問者として開始（P2P接続成功後）
+    startAsQuestioner() {
+        if (!this.p2pManager || !this.p2pManager.peerId) {
+            this.showMessage('P2P接続が確立されていません');
+            this.showScreen('connection-screen');
+            return;
         }
+        
+        const peerId = this.p2pManager.peerId;
+        
+        // ピアIDをルームIDとして使用
+        this.currentRoom = peerId;
+        
+        // ルーム参加者を初期化（質問者として登録）
+        this.roomParticipants[peerId] = {
+            questioner: { deviceId: 'host', connected: true },
+            answerer: null,
+            participantCount: 1
+        };
+        
+        document.getElementById('current-room-id').textContent = peerId;
+        this.showScreen('questioner-screen');
+        
+        this.showMessage(`質問者として開始しました\nピアID: ${peerId}`);
+    }
+
+    // 回答者として開始（P2P接続成功後）
+    startAsAnswerer() {
+        if (!this.p2pManager || !this.p2pManager.connection) {
+            this.showMessage('P2P接続が確立されていません');
+            this.showScreen('connection-screen');
+            return;
+        }
+        
+        // 接続先のピアIDをルームIDとして使用
+        const peerId = this.p2pManager.connection.peer;
+        this.currentRoom = peerId;
+        
+        // ルーム参加者情報を更新
+        this.roomParticipants[peerId] = {
+            questioner: { deviceId: 'host', connected: true },
+            answerer: { deviceId: 'answerer', connected: true },
+            participantCount: 2
+        };
+        
+        document.getElementById('current-room-id-answerer').textContent = peerId;
+        this.showScreen('answerer-screen');
+        document.getElementById('answerer-content').classList.remove('hidden');
+        
+        // 初期状態では回答ボタンを無効化
+        this.disableAnswerButtons();
+        
+        // 質問者に参加通知を送信
+        this.sendMessage({
+            type: 'participant_joined',
+            data: { roomId: peerId, role: 'answerer' }
+        });
+        
+        this.showMessage('回答者として質問者に接続しました');
     }
 
     
@@ -764,7 +791,7 @@ class CommUApp {
         this.showDebugLog('info', `接続方法を選択: ${method}`);
         
         if (method === 'p2p') {
-            this.showScreen('p2p-screen');
+            this.selectConnectionRole();
         }
     }
 
@@ -791,9 +818,6 @@ class CommUApp {
             // ホスト画面を表示
             document.getElementById('p2p-role-selection').classList.add('hidden');
             document.getElementById('p2p-host-section').classList.remove('hidden');
-            
-            // ピア検索は手動接続のみに限定（自動検索を無効化）
-            // 自動ピア検索はコンソールエラーの原因となるため無効化
             
             this.showMessage(`ピアID: ${peerId}\n他のデバイスからの接続を待っています`);
             
@@ -850,11 +874,10 @@ class CommUApp {
             
             await this.p2pManager.connectToPeer(targetPeerId);
             
-            // 接続成功時に回答者として参加
-            this.joinAsAnswerer(targetPeerId);
-            
             // 入力フィールドをクリア
             peerIdInput.value = '';
+            
+            // 接続成功後は handleP2PConnectionChange で役割選択画面に移動
             
         } catch (error) {
             this.showDebugLog('error', 'ピア接続失敗', error);
@@ -869,37 +892,6 @@ class CommUApp {
         }
     }
 
-    joinAsAnswerer(peerId) {
-        // ピアIDをルームIDとして使用
-        this.currentRoom = peerId;
-        
-        // ルーム参加者情報を更新
-        if (!this.roomParticipants[peerId]) {
-            this.roomParticipants[peerId] = {
-                questioner: { deviceId: 'host', connected: true },
-                answerer: { deviceId: 'answerer', connected: true },
-                participantCount: 2
-            };
-        } else {
-            this.roomParticipants[peerId].answerer = { deviceId: 'answerer', connected: true };
-            this.roomParticipants[peerId].participantCount = 2;
-        }
-        
-        document.getElementById('current-room-id-answerer').textContent = peerId;
-        this.showScreen('answerer-screen');
-        document.getElementById('answerer-content').classList.remove('hidden');
-        
-        // 初期状態では回答ボタンを無効化
-        this.disableAnswerButtons();
-        
-        // 質問者に参加通知を送信
-        this.sendMessage({
-            type: 'participant_joined',
-            data: { roomId: peerId, role: 'answerer' }
-        });
-        
-        this.showMessage('質問者に接続しました');
-    }
 
     // P2P接続状態変更
     handleP2PConnectionChange(state, errorMessage = null) {
@@ -907,8 +899,9 @@ class CommUApp {
         
         switch (state) {
             case 'connected':
-                this.showMessage('P2P接続が確立されました');
-                // 接続確立後は各役割の処理で画面遷移を行う
+                this.showMessage('P2P接続が確立されました\n役割を選んでください');
+                // 接続確立後は役割選択画面に移動
+                this.showScreen('role-screen');
                 break;
                 
             case 'disconnected':
@@ -920,12 +913,7 @@ class CommUApp {
             case 'error':
                 const message = errorMessage || 'P2P接続に失敗しました';
                 this.showMessage(message);
-                if (this.currentRole === 'answerer') {
-                    // 回答者の場合は役割選択画面に戻る
-                    this.showScreen('role-screen');
-                } else {
-                    this.showScreen('connection-screen');
-                }
+                this.showScreen('connection-screen');
                 break;
                 
             case 'waiting':
@@ -944,6 +932,30 @@ class CommUApp {
             const debugInfo = this.p2pManager.getDebugInfo();
             this.showDebugLog('info', 'P2P Debug Info:', debugInfo);
         }
+    }
+
+    // P2P接続をキャンセル
+    cancelP2PConnection() {
+        this.showDebugLog('info', 'P2P接続をキャンセル');
+        
+        // P2P接続を破棄
+        if (this.p2pManager) {
+            try {
+                if (this.p2pManager.peer) {
+                    this.p2pManager.peer.destroy();
+                }
+                if (this.p2pManager.connection) {
+                    this.p2pManager.connection.close();
+                }
+            } catch (error) {
+                this.showDebugLog('warn', 'P2P接続破棄時のエラー:', error);
+            }
+            this.p2pManager = null;
+        }
+        
+        // 接続画面に戻る
+        this.showScreen('connection-screen');
+        this.showMessage('P2P接続をキャンセルしました');
     }
 
     // メッセージ送信（P2Pのみ）
