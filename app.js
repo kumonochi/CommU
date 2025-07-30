@@ -1303,6 +1303,12 @@ class CommUApp {
         if (peerIdElement && peerIdElement.textContent) {
             const peerId = peerIdElement.textContent;
             
+            // QRCodeライブラリが読み込まれているかチェック
+            if (typeof QRCode === 'undefined') {
+                this.showMessage('QRコードライブラリが読み込まれていません。少し待ってから再試行してください。');
+                return;
+            }
+            
             // QRコードを生成
             QRCode.toCanvas(canvas, peerId, {
                 width: 200,
@@ -1338,6 +1344,12 @@ class CommUApp {
     // QRスキャン開始
     async startQRScan() {
         try {
+            // QrScannerライブラリが読み込まれているかチェック
+            if (typeof QrScanner === 'undefined') {
+                this.showMessage('QRスキャナーライブラリが読み込まれていません。少し待ってから再試行してください。');
+                return;
+            }
+            
             const video = document.getElementById('qr-video');
             const scanContainer = document.getElementById('qr-scanner-container');
             const scanBtn = document.getElementById('scan-qr-btn');
