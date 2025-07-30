@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234CAF50'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='12' text-anchor='middle' fill='white'%3EC%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.3.5">
+    <link rel="stylesheet" href="styles.css?v=2.4.0">
     
     <!-- キャッシュ制御用メタタグ -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -29,7 +29,7 @@
                 <h1 class="app-title">CommU⇆</h1>
                 <p class="subtitle">接続方法を選んでください</p>
                 <div class="version-info">
-                    <span>バージョン: </span><span id="app-version">2.3.5</span>
+                    <span>バージョン: </span><span id="app-version">2.4.0</span>
                     <span class="version-status" id="version-status">確認中...</span>
                 </div>
                 
@@ -66,12 +66,13 @@
                 </div>
                 
                 <div id="p2p-client-section" class="p2p-section hidden">
-                    <p class="subtitle">接続先のピアIDを入力してください</p>
+                    <p class="subtitle">質問者のピアIDを入力してください</p>
                     <div class="peer-input-container">
-                        <input type="text" id="peer-id-input" placeholder="ピアIDを入力 (例: abc123def456)">
+                        <input type="text" id="peer-id-input" placeholder="質問者のピアIDを入力">
                         <button class="primary-btn" id="connect-peer-btn">接続</button>
                     </div>
-                    <p class="status-text" id="client-status">ピアIDを入力して接続してください</p>
+                    <p class="status-text" id="client-status">質問者から教えてもらったピアIDを入力してください</p>
+                    <button class="secondary-btn" onclick="document.querySelector('#p2p-client-section').classList.add('hidden'); document.querySelector('#p2p-role-selection').classList.remove('hidden');">戻る</button>
                 </div>
 
                 <div id="p2p-role-selection" class="p2p-section">
@@ -105,104 +106,6 @@
             </div>
         </div>
 
-        <!-- ルーム作成画面 -->
-        <div id="room-create-screen" class="screen">
-            <div class="container">
-                <h2>ルームを作成</h2>
-                <p>5桁のルームIDを決めてください</p>
-                <div class="room-id-display">
-                    <span id="room-id-input">-----</span>
-                </div>
-                <div class="numpad">
-                    <button class="num-btn" data-num="1">1</button>
-                    <button class="num-btn" data-num="2">2</button>
-                    <button class="num-btn" data-num="3">3</button>
-                    <button class="num-btn" data-num="4">4</button>
-                    <button class="num-btn" data-num="5">5</button>
-                    <button class="num-btn" data-num="6">6</button>
-                    <button class="num-btn" data-num="7">7</button>
-                    <button class="num-btn" data-num="8">8</button>
-                    <button class="num-btn" data-num="9">9</button>
-                    <button class="num-btn clear-btn">クリア</button>
-                    <button class="num-btn" data-num="0">0</button>
-                    <button class="num-btn random-btn">ランダム</button>
-                </div>
-                <div class="button-group">
-                    <button class="primary-btn" id="create-room-btn" disabled>ルームを作成</button>
-                    <button class="secondary-btn" id="back-to-role-btn">戻る</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- パスワード設定画面 -->
-        <div id="password-setup-screen" class="screen">
-            <div class="container">
-                <h2>パスワードを設定</h2>
-                <p>ルーム「<span id="setup-room-id"></span>」の4桁パスワードを設定してください</p>
-                <div class="room-id-display">
-                    <span id="password-setup-input">----</span>
-                </div>
-                <div class="password-numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 200px; margin: 20px auto;">
-                    <button class="password-setup-btn" data-char="a">a</button>
-                    <button class="password-setup-btn" data-char="b">b</button>
-                    <button class="password-setup-btn" data-char="c">c</button>
-                    <button class="password-setup-btn" data-char="d">d</button>
-                    <button class="password-setup-btn" data-char="e">e</button>
-                    <button class="password-setup-btn" data-char="f">f</button>
-                    <button class="password-setup-btn" data-char="g">g</button>
-                    <button class="password-setup-btn" data-char="h">h</button>
-                    <button class="password-setup-btn" data-char="i">i</button>
-                </div>
-                <div style="text-align: center; margin: 10px 0;">
-                    <button class="secondary-btn" id="clear-password-setup-btn" style="margin: 0 10px;">クリア</button>
-                    <button class="secondary-btn" id="random-password-setup-btn" style="margin: 0 10px;">ランダム</button>
-                </div>
-                <div class="button-group">
-                    <button class="primary-btn" id="complete-room-creation-btn" disabled>ルーム作成完了</button>
-                    <button class="secondary-btn" id="back-to-room-create">戻る</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- ルーム参加画面 -->
-        <div id="room-join-screen" class="screen">
-            <div class="container">
-                <h2>ルームを選択</h2>
-                <div id="room-list" class="room-list">
-                    <!-- ルーム一覧が動的に生成される -->
-                </div>
-                <button class="secondary-btn" id="back-to-role-btn2">戻る</button>
-            </div>
-        </div>
-        
-        <!-- パスワード入力画面 -->
-        <div id="password-screen" class="screen">
-            <div class="container">
-                <h2>パスワードを入力</h2>
-                <p>ルーム「<span id="target-room-id"></span>」のパスワードを入力してください</p>
-                <div class="room-id-display">
-                    <span id="password-entry-input">----</span>
-                </div>
-                <div class="password-numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 200px; margin: 20px auto;">
-                    <button class="password-entry-btn" data-char="a">a</button>
-                    <button class="password-entry-btn" data-char="b">b</button>
-                    <button class="password-entry-btn" data-char="c">c</button>
-                    <button class="password-entry-btn" data-char="d">d</button>
-                    <button class="password-entry-btn" data-char="e">e</button>
-                    <button class="password-entry-btn" data-char="f">f</button>
-                    <button class="password-entry-btn" data-char="g">g</button>
-                    <button class="password-entry-btn" data-char="h">h</button>
-                    <button class="password-entry-btn" data-char="i">i</button>
-                </div>
-                <div style="text-align: center; margin: 10px 0;">
-                    <button class="secondary-btn clear-password-entry-btn">クリア</button>
-                </div>
-                <div class="button-group">
-                    <button class="primary-btn" id="join-with-password-btn" disabled>入室</button>
-                    <button class="secondary-btn" id="back-to-room-list">戻る</button>
-                </div>
-            </div>
-        </div>
 
         <!-- 質問者画面 -->
         <div id="questioner-screen" class="screen">
@@ -373,7 +276,7 @@
                 // バージョン情報を取得
                 const messageChannel = new MessageChannel();
                 messageChannel.port1.onmessage = function(event) {
-                    const currentVersion = '2.3.5';
+                    const currentVersion = '2.4.0';
                     const swVersion = event.data.version;
                     const versionStatus = document.getElementById('version-status');
                     
@@ -402,7 +305,7 @@
     <!-- PeerJS ライブラリ（P2P通信用） -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     
-    <script src="p2p-utils.js?v=2.3.5"></script>
-    <script src="app.js?v=2.3.5"></script>
+    <script src="p2p-utils.js?v=2.4.0"></script>
+    <script src="app.js?v=2.4.0"></script>
 </body>
 </html>

@@ -80,15 +80,6 @@ class CommUApp {
         document.getElementById('answerer-role').addEventListener('click', () => this.selectRole('answerer'));
         document.getElementById('sound-role').addEventListener('click', () => this.selectRole('sound'));
 
-        // ルーム作成
-        this.setupNumpad();
-        document.getElementById('create-room-btn').addEventListener('click', () => this.createRoom());
-        document.getElementById('back-to-role-btn').addEventListener('click', () => this.showScreen('role-screen'));
-        document.getElementById('back-to-role-btn2').addEventListener('click', () => this.showScreen('role-screen'));
-        
-        // パスワード設定画面
-        document.getElementById('complete-room-creation-btn').addEventListener('click', () => this.completeRoomCreation());
-        document.getElementById('back-to-room-create').addEventListener('click', () => this.showScreen('room-create-screen'));
 
         // 質問者画面
         document.getElementById('send-question-btn').addEventListener('click', () => this.sendQuestion());
@@ -147,158 +138,6 @@ class CommUApp {
         }
     }
 
-    setupNumpad() {
-        const numBtns = document.querySelectorAll('.num-btn[data-num]');
-        const clearBtn = document.querySelector('.clear-btn');
-        const randomBtn = document.querySelector('.random-btn');
-        const roomIdInput = document.getElementById('room-id-input');
-        const createBtn = document.getElementById('create-room-btn');
-
-        let roomId = '';
-
-        numBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (roomId.length < 5) {
-                    roomId += btn.dataset.num;
-                    this.updateRoomIdDisplay(roomId);
-                    if (roomId.length === 5) {
-                        createBtn.disabled = false;
-                    }
-                }
-            });
-        });
-
-        clearBtn.addEventListener('click', () => {
-            roomId = '';
-            this.updateRoomIdDisplay('');
-            createBtn.disabled = true;
-        });
-
-        randomBtn.addEventListener('click', () => {
-            roomId = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-            this.updateRoomIdDisplay(roomId);
-            createBtn.disabled = false;
-        });
-        
-        // パスワード設定システム
-        this.setupPasswordSetup();
-        // パスワード入力システム
-        this.setupPasswordEntry();
-    }
-    
-    setupPasswordSetup() {
-        // パスワード設定画面でのパスワード入力
-        const passwordSetupBtns = document.querySelectorAll('.password-setup-btn[data-char]');
-        const clearPasswordSetupBtn = document.getElementById('clear-password-setup-btn');
-        const randomPasswordSetupBtn = document.getElementById('random-password-setup-btn');
-        const completeBtn = document.getElementById('complete-room-creation-btn');
-        
-        let password = '';
-        
-        passwordSetupBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (password.length < 4) {
-                    password += btn.dataset.char;
-                    this.updatePasswordSetupDisplay(password);
-                    this.currentSetupPassword = password;
-                    if (password.length === 4) {
-                        completeBtn.disabled = false;
-                    }
-                }
-            });
-        });
-        
-        if (clearPasswordSetupBtn) {
-            clearPasswordSetupBtn.addEventListener('click', () => {
-                password = '';
-                this.updatePasswordSetupDisplay('');
-                this.currentSetupPassword = '';
-                completeBtn.disabled = true;
-            });
-        }
-        
-        if (randomPasswordSetupBtn) {
-            randomPasswordSetupBtn.addEventListener('click', () => {
-                const chars = 'abcdefghi';
-                password = '';
-                for (let i = 0; i < 4; i++) {
-                    password += chars[Math.floor(Math.random() * chars.length)];
-                }
-                this.updatePasswordSetupDisplay(password);
-                this.currentSetupPassword = password;
-                completeBtn.disabled = false;
-            });
-        }
-    }
-    
-    setupPasswordEntry() {
-        const passwordEntryBtns = document.querySelectorAll('.password-entry-btn[data-char]');
-        const clearPasswordEntryBtn = document.querySelector('.clear-password-entry-btn');
-        const joinBtn = document.getElementById('join-with-password-btn');
-        const backToRoomListBtn = document.getElementById('back-to-room-list');
-        
-        let entryPassword = '';
-        
-        passwordEntryBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (entryPassword.length < 4) {
-                    entryPassword += btn.dataset.char;
-                    this.updatePasswordEntryDisplay(entryPassword);
-                    if (entryPassword.length === 4) {
-                        joinBtn.disabled = false;
-                    }
-                }
-            });
-        });
-        
-        if (clearPasswordEntryBtn) {
-            clearPasswordEntryBtn.addEventListener('click', () => {
-                entryPassword = '';
-                this.updatePasswordEntryDisplay('');
-                joinBtn.disabled = true;
-            });
-        }
-        
-        if (joinBtn) {
-            joinBtn.addEventListener('click', () => {
-                this.attemptJoinWithPassword(entryPassword);
-                entryPassword = '';
-                this.updatePasswordEntryDisplay('');
-                joinBtn.disabled = true;
-            });
-        }
-        
-        if (backToRoomListBtn) {
-            backToRoomListBtn.addEventListener('click', () => {
-                this.showScreen('room-join-screen');
-                entryPassword = '';
-                this.updatePasswordEntryDisplay('');
-                joinBtn.disabled = true;
-            });
-        }
-    }
-
-    updateRoomIdDisplay(roomId) {
-        const display = document.getElementById('room-id-input');
-        const padded = roomId.padEnd(5, '-');
-        display.textContent = padded;
-    }
-    
-    updatePasswordSetupDisplay(password) {
-        const display = document.getElementById('password-setup-input');
-        if (display) {
-            const padded = password.padEnd(4, '-');
-            display.textContent = padded;
-        }
-    }
-    
-    updatePasswordEntryDisplay(password) {
-        const display = document.getElementById('password-entry-input');
-        if (display) {
-            const padded = password.padEnd(4, '-');
-            display.textContent = padded;
-        }
-    }
     
 
 
@@ -316,15 +155,6 @@ class CommUApp {
                 break;
             case 'message':
                 this.receiveMessage(message.data);
-                break;
-            case 'room_created':
-                this.handleRoomCreated(message.data);
-                break;
-            case 'room_joined':
-                this.handleRoomJoined(message.data);
-                break;
-            case 'room_full':
-                this.handleRoomFull(message.data);
                 break;
             case 'participant_joined':
                 this.handleParticipantJoined(message.data);
@@ -345,10 +175,10 @@ class CommUApp {
         
         switch (role) {
             case 'questioner':
-                this.showScreen('room-create-screen');
+                this.startAsQuestioner();
                 break;
             case 'answerer':
-                this.showRoomList();
+                this.startAsAnswerer();
                 break;
             case 'sound':
                 this.showScreen('sound-mode-screen');
@@ -356,62 +186,52 @@ class CommUApp {
         }
     }
 
-    createRoom() {
-        const roomId = document.getElementById('room-id-input').textContent.replace(/-/g, '');
-        
-        if (roomId.length !== 5) {
-            this.showMessage('5桁のルームIDを入力してください');
-            return;
-        }
-        
-        // パスワード設定画面に移動
-        this.pendingRoomId = roomId;
-        document.getElementById('setup-room-id').textContent = roomId;
-        this.showScreen('password-setup-screen');
-        
-        // パスワード入力をリセット
-        this.updatePasswordSetupDisplay('');
-        const completeBtn = document.getElementById('complete-room-creation-btn');
-        if (completeBtn) {
-            completeBtn.disabled = true;
+    async startAsQuestioner() {
+        try {
+            // P2Pホストとして開始
+            if (!this.p2pManager) {
+                this.p2pManager = new P2PManager();
+                this.p2pManager.onMessage = (message) => this.processMessage(message);
+                this.p2pManager.onConnectionChange = (state, error) => this.handleP2PConnectionChange(state, error);
+            }
+            
+            const peerId = await this.p2pManager.createHost();
+            
+            // ピアIDをルームIDとして使用
+            this.currentRoom = peerId;
+            
+            // ルーム参加者を初期化（質問者として登録）
+            this.roomParticipants[peerId] = {
+                questioner: { deviceId: 'host', connected: true },
+                answerer: null,
+                participantCount: 1
+            };
+            
+            document.getElementById('current-room-id').textContent = peerId;
+            this.showScreen('questioner-screen');
+            
+            this.showMessage(`ルーム開始\nピアID: ${peerId}\n回答者の接続を待っています`);
+            
+        } catch (error) {
+            this.showMessage(`ルーム開始に失敗しました: ${error.message}`);
+            this.showScreen('role-screen');
         }
     }
-    
-    completeRoomCreation() {
-        const roomId = this.pendingRoomId;
-        const password = this.currentSetupPassword;
+
+    startAsAnswerer() {
+        // 接続先のピアIDを入力する画面を表示
+        this.showScreen('p2p-screen');
+        document.getElementById('p2p-role-selection').classList.add('hidden');
+        document.getElementById('p2p-client-section').classList.remove('hidden');
         
-        if (!roomId || roomId.length !== 5 || !password || password.length !== 4) {
-            this.showMessage('ルームIDとパスワードを正しく設定してください');
-            return;
+        // 入力フィールドにフォーカス
+        const peerIdInput = document.getElementById('peer-id-input');
+        if (peerIdInput) {
+            peerIdInput.focus();
+            peerIdInput.placeholder = '質問者のピアIDを入力してください';
         }
-        
-        // 部屋を切り替える際にチャット履歴を管理
-        this.switchToRoom(roomId);
-        
-        // パスワードを保存
-        this.roomPasswords[roomId] = password;
-        
-        // ルーム参加者を初期化（質問者として登録）
-        this.roomParticipants[roomId] = {
-            questioner: { deviceId: 'host', connected: true },
-            answerer: null,
-            participantCount: 1
-        };
-        
-        document.getElementById('current-room-id').textContent = roomId;
-        this.showScreen('questioner-screen');
-        
-        // ルーム作成をP2P経由で通知
-        this.sendMessage({
-            type: 'room_created',
-            data: { roomId: roomId, creatorRole: 'questioner', password: password }
-        });
-        
-        // 一時変数をクリア
-        this.pendingRoomId = null;
-        this.currentSetupPassword = '';
     }
+
     
     // 部屋を切り替える際のチャット履歴管理
     switchToRoom(roomId) {
@@ -430,160 +250,6 @@ class CommUApp {
         this.updateChatHistoryDisplay();
     }
 
-    showRoomList() {
-        this.refreshRoomList();
-        this.showScreen('room-join-screen');
-    }
-    
-    refreshRoomList() {
-        const roomList = document.getElementById('room-list');
-        roomList.innerHTML = '';
-        
-        // 質問者が入室している部屋のみを表示（参加者数が正確に管理されている）
-        const activeRooms = Object.keys(this.roomParticipants).filter(roomId => {
-            const roomInfo = this.roomParticipants[roomId];
-            return roomInfo && roomInfo.questioner && roomInfo.questioner.connected && roomInfo.participantCount > 0;
-        });
-        
-        if (activeRooms.length === 0) {
-            const noRoomsMessage = document.createElement('div');
-            noRoomsMessage.className = 'no-rooms-message';
-            noRoomsMessage.textContent = '現在利用可能な部屋がありません';
-            noRoomsMessage.style.cssText = 'text-align: center; padding: 20px; color: #999; font-style: italic;';
-            roomList.appendChild(noRoomsMessage);
-        } else {
-            activeRooms.forEach(roomId => {
-                const roomItem = document.createElement('button');
-                roomItem.className = 'room-item';
-                roomItem.style.cssText = 'width: 100%; padding: 15px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; text-align: left;';
-                
-                // ルーム満員チェック
-                const roomInfo = this.roomParticipants[roomId];
-                const isFull = roomInfo && roomInfo.participantCount >= 2;
-                
-                if (isFull) {
-                    roomItem.textContent = `ルーム ${roomId} (満席)`;
-                    roomItem.disabled = true;
-                    roomItem.style.backgroundColor = '#f5f5f5';
-                    roomItem.style.color = '#999';
-                    roomItem.addEventListener('click', () => this.showMessage('満席です'));
-                } else {
-                    roomItem.textContent = `ルーム ${roomId} (参加者: ${roomInfo.participantCount}/2)`;
-                    roomItem.addEventListener('click', () => this.showPasswordScreen(roomId));
-                    
-                    // ホバー効果
-                    roomItem.addEventListener('mouseenter', () => {
-                        roomItem.style.backgroundColor = '#f0f0f0';
-                    });
-                    roomItem.addEventListener('mouseleave', () => {
-                        roomItem.style.backgroundColor = 'white';
-                    });
-                }
-                
-                roomList.appendChild(roomItem);
-            });
-        }
-        
-        // 再読み込みボタンを追加
-        const refreshBtn = document.createElement('button');
-        refreshBtn.textContent = '🔄 再読込';
-        refreshBtn.className = 'refresh-btn';
-        refreshBtn.title = '最新の部屋情報を読み込みます';
-        refreshBtn.style.cssText = 'padding: 8px 16px; margin: 10px auto; display: block; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; color: #666; cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease;';
-        refreshBtn.addEventListener('click', () => {
-            refreshBtn.textContent = '🔄 読み込み中...';
-            refreshBtn.disabled = true;
-            setTimeout(() => {
-                this.refreshRoomList();
-                refreshBtn.textContent = '🔄 再読込';
-                refreshBtn.disabled = false;
-            }, 500);
-        });
-        
-        // ホバー効果
-        refreshBtn.addEventListener('mouseenter', () => {
-            refreshBtn.style.backgroundColor = '#e8e8e8';
-        });
-        refreshBtn.addEventListener('mouseleave', () => {
-            refreshBtn.style.backgroundColor = '#f8f8f8';
-        });
-        
-        roomList.appendChild(refreshBtn);
-    }
-    
-    showPasswordScreen(roomId) {
-        this.targetRoomId = roomId;
-        document.getElementById('target-room-id').textContent = roomId;
-        this.showScreen('password-screen');
-        
-        // パスワード入力をリセット
-        this.updatePasswordEntryDisplay('');
-        const joinBtn = document.getElementById('join-with-password-btn');
-        if (joinBtn) {
-            joinBtn.disabled = true;
-        }
-    }
-    
-    attemptJoinWithPassword(enteredPassword) {
-        const roomId = this.targetRoomId;
-        const correctPassword = this.roomPasswords[roomId];
-        
-        if (!correctPassword) {
-            this.showMessage('このルームは存在しません');
-            return;
-        }
-        
-        if (enteredPassword !== correctPassword) {
-            this.showMessage('パスワードが間違っています');
-            return;
-        }
-        
-        // パスワードが正しい場合、ルームに参加
-        this.joinRoom(roomId);
-    }
-
-    joinRoom(roomId) {
-        // ルーム満員チェック
-        const roomInfo = this.roomParticipants[roomId];
-        if (roomInfo && roomInfo.participantCount >= 2) {
-            this.showMessage('満席です');
-            return;
-        }
-        
-        // 部屋を切り替える際にチャット履歴を管理
-        this.switchToRoom(roomId);
-        
-        // ルーム参加者情報を更新
-        if (!this.roomParticipants[roomId]) {
-            this.roomParticipants[roomId] = {
-                questioner: null,
-                answerer: { deviceId: 'answerer', connected: true },
-                participantCount: 1
-            };
-        } else {
-            this.roomParticipants[roomId].answerer = { deviceId: 'answerer', connected: true };
-            this.roomParticipants[roomId].participantCount = 2;
-        }
-        
-        document.getElementById('current-room-id-answerer').textContent = roomId;
-        this.showScreen('answerer-screen');
-        document.getElementById('answerer-content').classList.remove('hidden');
-        
-        // 初期状態では回答ボタンを無効化
-        this.disableAnswerButtons();
-        
-        // ルーム参加をP2P経由で通知
-        this.sendMessage({
-            type: 'room_joined',
-            data: { roomId: roomId, joinerRole: 'answerer' }
-        });
-        
-        // 質問者に参加通知を送信
-        this.sendMessage({
-            type: 'participant_joined',
-            data: { roomId: roomId, role: 'answerer' }
-        });
-    }
 
     sendQuestion() {
         const questionText = document.getElementById('question-input').value.trim();
@@ -872,7 +538,6 @@ class CommUApp {
             // 参加者がいなくなったらルーム情報を削除
             if (this.roomParticipants[this.currentRoom].participantCount <= 0) {
                 delete this.roomParticipants[this.currentRoom];
-                delete this.roomPasswords[this.currentRoom];
                 delete this.roomChatHistory[this.currentRoom];
             }
             
@@ -1044,21 +709,6 @@ class CommUApp {
         this.showMessage(`デバッグモード: ${this.debugMode ? 'ON' : 'OFF'}`);
     }
 
-    // ルーム関連のイベントハンドラー
-    handleRoomCreated(data) {
-        // ルーム作成の通知を受信した場合の処理
-        console.log('Room created:', data);
-    }
-
-    handleRoomJoined(data) {
-        // ルーム参加の通知を受信した場合の処理
-        console.log('Room joined:', data);
-    }
-
-    handleRoomFull(data) {
-        // ルーム満員の通知を受信した場合の処理
-        this.showMessage('満席です');
-    }
 
     handleParticipantJoined(data) {
         if (this.currentRole === 'questioner' && data.role === 'answerer') {
@@ -1100,7 +750,6 @@ class CommUApp {
             // 参加者がいなくなったらルーム情報を削除
             if (this.roomParticipants[data.roomId].participantCount <= 0) {
                 delete this.roomParticipants[data.roomId];
-                delete this.roomPasswords[data.roomId];
                 delete this.roomChatHistory[data.roomId];
             }
         }
@@ -1201,11 +850,8 @@ class CommUApp {
             
             await this.p2pManager.connectToPeer(targetPeerId);
             
-            if (statusElement) {
-                statusElement.textContent = '接続完了';
-            }
-            
-            this.showDebugLog('info', '接続処理が完了しました');
+            // 接続成功時に回答者として参加
+            this.joinAsAnswerer(targetPeerId);
             
             // 入力フィールドをクリア
             peerIdInput.value = '';
@@ -1223,6 +869,38 @@ class CommUApp {
         }
     }
 
+    joinAsAnswerer(peerId) {
+        // ピアIDをルームIDとして使用
+        this.currentRoom = peerId;
+        
+        // ルーム参加者情報を更新
+        if (!this.roomParticipants[peerId]) {
+            this.roomParticipants[peerId] = {
+                questioner: { deviceId: 'host', connected: true },
+                answerer: { deviceId: 'answerer', connected: true },
+                participantCount: 2
+            };
+        } else {
+            this.roomParticipants[peerId].answerer = { deviceId: 'answerer', connected: true };
+            this.roomParticipants[peerId].participantCount = 2;
+        }
+        
+        document.getElementById('current-room-id-answerer').textContent = peerId;
+        this.showScreen('answerer-screen');
+        document.getElementById('answerer-content').classList.remove('hidden');
+        
+        // 初期状態では回答ボタンを無効化
+        this.disableAnswerButtons();
+        
+        // 質問者に参加通知を送信
+        this.sendMessage({
+            type: 'participant_joined',
+            data: { roomId: peerId, role: 'answerer' }
+        });
+        
+        this.showMessage('質問者に接続しました');
+    }
+
     // P2P接続状態変更
     handleP2PConnectionChange(state, errorMessage = null) {
         this.showDebugLog('info', `P2P接続状態: ${state}`);
@@ -1230,9 +908,7 @@ class CommUApp {
         switch (state) {
             case 'connected':
                 this.showMessage('P2P接続が確立されました');
-                this.showScreen('role-screen');
-                
-                // P2P接続が成功したため、接続処理完了
+                // 接続確立後は各役割の処理で画面遷移を行う
                 break;
                 
             case 'disconnected':
@@ -1244,7 +920,12 @@ class CommUApp {
             case 'error':
                 const message = errorMessage || 'P2P接続に失敗しました';
                 this.showMessage(message);
-                this.showScreen('connection-screen');
+                if (this.currentRole === 'answerer') {
+                    // 回答者の場合は役割選択画面に戻る
+                    this.showScreen('role-screen');
+                } else {
+                    this.showScreen('connection-screen');
+                }
                 break;
                 
             case 'waiting':
