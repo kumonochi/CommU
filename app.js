@@ -1310,24 +1310,27 @@ class CommUApp {
                 return;
             }
             
+            // 既存のQRコードをクリア
+            canvas.innerHTML = '';
+            
             // QRコードを生成
-            QRCode.toCanvas(canvas, peerId, {
-                width: 200,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            }, (error) => {
-                if (error) {
-                    console.error('QRコード生成エラー:', error);
-                    this.showMessage('QRコードの生成に失敗しました');
-                } else {
-                    qrContainer.classList.remove('hidden');
-                    showBtn.classList.add('hidden');
-                    hideBtn.classList.remove('hidden');
-                }
-            });
+            try {
+                new QRCode(canvas, {
+                    text: peerId,
+                    width: 200,
+                    height: 200,
+                    colorDark: '#000000',
+                    colorLight: '#FFFFFF',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+                
+                qrContainer.classList.remove('hidden');
+                showBtn.classList.add('hidden');
+                hideBtn.classList.remove('hidden');
+            } catch (error) {
+                console.error('QRコード生成エラー:', error);
+                this.showMessage('QRコードの生成に失敗しました');
+            }
         }
     }
     
