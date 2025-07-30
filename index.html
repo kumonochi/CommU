@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234CAF50'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='12' text-anchor='middle' fill='white'%3EC%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.4.2">
+    <link rel="stylesheet" href="styles.css?v=2.4.3">
     
     <!-- キャッシュ制御用メタタグ -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -29,7 +29,7 @@
                 <h1 class="app-title">CommU⇆</h1>
                 <p class="subtitle">接続方法を選んでください</p>
                 <div class="version-info">
-                    <span>バージョン: </span><span id="app-version">2.4.2</span>
+                    <span>バージョン: </span><span id="app-version">2.4.3</span>
                     <span class="version-status" id="version-status">確認中...</span>
                 </div>
                 
@@ -60,25 +60,54 @@
             <div class="container">
                 <h2>P2P接続</h2>
                 <div id="p2p-host-section" class="p2p-section hidden">
-                    <p class="subtitle">他のデバイスからの接続を待っています</p>
-                    <div class="connection-info">
-                        <p>ピアID: <span id="peer-id"></span></p>
-                        <p class="status-text" id="host-status">相手の接続を待っています...</p>
-                        <div class="connection-instructions">
-                            <p>相手のデバイスで、このピアIDを入力してもらってください。</p>
+                    <div class="p2p-content">
+                        <h3>接続を待つ</h3>
+                        <p class="subtitle">他のデバイスからの接続を待っています</p>
+                        
+                        <div class="connection-info" style="text-align: center; margin: 20px 0;">
+                            <div class="peer-id-display" style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">あなたのピアID:</label>
+                                <div class="peer-id-box" style="padding: 12px; background: #f5f5f5; border: 2px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 16px; font-weight: bold; letter-spacing: 1px;">
+                                    <span id="peer-id"></span>
+                                </div>
+                            </div>
+                            <p class="status-text" id="host-status" style="color: #666; font-style: italic;">相手の接続を待っています...</p>
+                        </div>
+                        
+                        <div class="connection-instructions" style="text-align: center; margin: 20px 0; padding: 15px; background: #e8f4f8; border-radius: 8px; border-left: 4px solid #2196F3;">
+                            <p style="margin: 0; color: #1976D2;">📱 相手のデバイスで、このピアIDを入力してもらってください</p>
+                        </div>
+                        
+                        <div class="button-container" style="text-align: center; margin-top: 30px;">
+                            <button class="secondary-btn" id="cancel-host-btn" style="padding: 10px 20px; border-radius: 8px;">戻る</button>
                         </div>
                     </div>
-                    <button class="secondary-btn" id="cancel-host-btn">戻る</button>
                 </div>
                 
                 <div id="p2p-client-section" class="p2p-section hidden">
-                    <p class="subtitle">質問者のピアIDを入力してください</p>
-                    <div class="peer-input-container">
-                        <input type="text" id="peer-id-input" placeholder="質問者のピアIDを入力">
-                        <button class="primary-btn" id="connect-peer-btn">接続</button>
+                    <div class="p2p-content">
+                        <h3>相手に接続</h3>
+                        <p class="subtitle">質問者のピアIDを入力してください</p>
+                        
+                        <div class="connection-info" style="text-align: center; margin: 20px 0;">
+                            <div class="peer-input-area" style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">相手のピアID:</label>
+                                <div class="peer-input-container" style="display: flex; gap: 10px; align-items: center; justify-content: center; max-width: 400px; margin: 0 auto;">
+                                    <input type="text" id="peer-id-input" placeholder="質問者のピアIDを入力" style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 16px;">
+                                    <button class="primary-btn" id="connect-peer-btn" style="padding: 12px 20px; white-space: nowrap;">接続</button>
+                                </div>
+                            </div>
+                            <p class="status-text" id="client-status" style="color: #666; font-style: italic;">質問者から教えてもらったピアIDを入力してください</p>
+                        </div>
+                        
+                        <div class="connection-instructions" style="text-align: center; margin: 20px 0; padding: 15px; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #4CAF50;">
+                            <p style="margin: 0; color: #2E7D32;">📱 質問者から教えてもらったピアIDを正確に入力してください</p>
+                        </div>
+                        
+                        <div class="button-container" style="text-align: center; margin-top: 30px;">
+                            <button class="secondary-btn" id="cancel-client-btn" style="padding: 10px 20px; border-radius: 8px;">戻る</button>
+                        </div>
                     </div>
-                    <p class="status-text" id="client-status">質問者から教えてもらったピアIDを入力してください</p>
-                    <button class="secondary-btn" id="cancel-client-btn">戻る</button>
                 </div>
 
                 <div id="p2p-role-selection" class="p2p-section">
@@ -283,7 +312,7 @@
                 // バージョン情報を取得
                 const messageChannel = new MessageChannel();
                 messageChannel.port1.onmessage = function(event) {
-                    const currentVersion = '2.4.2';
+                    const currentVersion = '2.4.3';
                     const swVersion = event.data.version;
                     const versionStatus = document.getElementById('version-status');
                     
@@ -312,7 +341,7 @@
     <!-- PeerJS ライブラリ（P2P通信用） -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     
-    <script src="p2p-utils.js?v=2.4.2"></script>
-    <script src="app.js?v=2.4.2"></script>
+    <script src="p2p-utils.js?v=2.4.3"></script>
+    <script src="app.js?v=2.4.3"></script>
 </body>
 </html>

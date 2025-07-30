@@ -78,7 +78,6 @@ class CommUApp {
         // 役割選択
         document.getElementById('questioner-role').addEventListener('click', () => this.selectRole('questioner'));
         document.getElementById('answerer-role').addEventListener('click', () => this.selectRole('answerer'));
-        document.getElementById('sound-role').addEventListener('click', () => this.selectRole('sound'));
 
 
         // 質問者画面
