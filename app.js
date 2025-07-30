@@ -737,13 +737,19 @@ class CommUApp {
 
     toggleDebugMode() {
         this.debugMode = !this.debugMode;
-        const debugElement = document.getElementById('debug-console');
+        const debugElement = this.getOrCreateDebugElement();
         
         if (this.debugMode) {
             this.showDebugLog('info', 'デバッグモードを有効にしました');
-            if (debugElement) debugElement.style.display = 'block';
+            debugElement.style.display = 'block';
+            // 全画面でのデバッグコンソール表示のため、位置を固定
+            debugElement.style.position = 'fixed';
+            debugElement.style.bottom = '0';
+            debugElement.style.left = '0';
+            debugElement.style.right = '0';
+            debugElement.style.zIndex = '9999';
         } else {
-            if (debugElement) debugElement.style.display = 'none';
+            debugElement.style.display = 'none';
         }
         
         this.showMessage(`デバッグモード: ${this.debugMode ? 'ON' : 'OFF'}`);
@@ -773,8 +779,11 @@ class CommUApp {
                 this.roomParticipants[data.roomId].questioner = null;
                 this.roomParticipants[data.roomId].participantCount--;
                 if (this.currentRole === 'answerer' && this.currentRoom === data.roomId) {
-                    this.showMessage('質問者が退出しました');
-                    this.resetQuestion();
+                    this.showMessage('質問者が退出しました。接続画面に戻ります。');
+                    // 回答者も強制的に退出
+                    setTimeout(() => {
+                        this.disconnectAndReturnToTitle();
+                    }, 2000);
                 }
             } else if (data.role === 'answerer') {
                 this.roomParticipants[data.roomId].answerer = null;

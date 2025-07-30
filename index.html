@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234CAF50'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='12' text-anchor='middle' fill='white'%3EC%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.4.6">
+    <link rel="stylesheet" href="styles.css?v=2.4.7">
     
     <!-- キャッシュ制御用メタタグ -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -28,10 +28,6 @@
             <div class="container">
                 <h1 class="app-title">CommU⇆</h1>
                 <p class="subtitle">接続方法を選んでください</p>
-                <div class="version-info">
-                    <span>バージョン: </span><span id="app-version">2.4.6</span>
-                    <span class="version-status" id="version-status">確認中...</span>
-                </div>
                 
                 <div class="connection-methods">
                     <button class="connection-method-btn p2p-btn" id="p2p-connection">
@@ -308,26 +304,6 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.ready.then(registration => {
                 registration.update();
-                
-                // バージョン情報を取得
-                const messageChannel = new MessageChannel();
-                messageChannel.port1.onmessage = function(event) {
-                    const currentVersion = '2.4.6';
-                    const swVersion = event.data.version;
-                    const versionStatus = document.getElementById('version-status');
-                    
-                    if (swVersion === currentVersion) {
-                        versionStatus.textContent = '最新版';
-                        versionStatus.className = 'version-status latest';
-                    } else {
-                        versionStatus.textContent = '更新あり';
-                        versionStatus.className = 'version-status update-available';
-                    }
-                };
-                
-                if (registration.active) {
-                    registration.active.postMessage({type: 'GET_VERSION'}, [messageChannel.port2]);
-                }
             });
         }
     }
@@ -341,7 +317,7 @@
     <!-- PeerJS ライブラリ（P2P通信用） -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     
-    <script src="p2p-utils.js?v=2.4.6"></script>
-    <script src="app.js?v=2.4.6"></script>
+    <script src="p2p-utils.js?v=2.4.7"></script>
+    <script src="app.js?v=2.4.7"></script>
 </body>
 </html>
