@@ -1299,7 +1299,7 @@ class CommUApp {
         const qrContainer = document.getElementById('qr-code-container');
         const showBtn = document.getElementById('show-qr-btn');
         const hideBtn = document.getElementById('hide-qr-btn');
-        const canvas = document.getElementById('qr-canvas');
+        const qrDiv = document.getElementById('qr-canvas');
         
         if (peerIdElement && peerIdElement.textContent) {
             const peerId = peerIdElement.textContent;
@@ -1311,11 +1311,11 @@ class CommUApp {
             }
             
             // 既存のQRコードをクリア
-            canvas.innerHTML = '';
+            qrDiv.innerHTML = '';
             
             // QRコードを生成
             try {
-                new QRCode(canvas, {
+                new QRCode(qrDiv, {
                     text: peerId,
                     width: 200,
                     height: 200,

@@ -726,6 +726,12 @@ h2, h3 {
 }
 
 #qr-canvas {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#qr-canvas img {
     border: 2px solid #E0E0E0;
     border-radius: 10px;
 }
