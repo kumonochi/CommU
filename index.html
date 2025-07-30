@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234CAF50'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='12' text-anchor='middle' fill='white'%3EC%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.4.13">
+    <link rel="stylesheet" href="styles.css?v=2.4.14">
     
     <!-- キャッシュ制御用メタタグ -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -29,7 +29,7 @@
                 <h1 class="app-title">CommU⇆</h1>
                 <p class="subtitle">接続方法を選んでください</p>
                 <div class="version-info">
-                    <span>バージョン: </span><span id="app-version">2.4.11</span>
+                    <span>バージョン: </span><span id="app-version">2.4.14</span>
                 </div>
                 
                 <div class="connection-methods">
@@ -93,13 +93,13 @@
                 <div id="p2p-client-section" class="p2p-section hidden">
                     <div class="p2p-content">
                         <h3>相手に接続</h3>
-                        <p class="subtitle">質問者のピアIDを入力してください</p>
+                        <p class="subtitle">ホストのピアIDを入力してください</p>
                         
                         <div class="connection-info" style="text-align: center; margin: 20px 0;">
                             <div class="peer-input-area" style="margin-bottom: 15px;">
                                 <label style="display: block; margin-bottom: 8px; font-weight: bold;">相手のピアID:</label>
                                 <div class="peer-input-container" style="display: flex; gap: 10px; align-items: center; justify-content: center; max-width: 400px; margin: 0 auto;">
-                                    <input type="text" id="peer-id-input" placeholder="質問者のピアIDを入力" style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 16px;">
+                                    <input type="text" id="peer-id-input" placeholder="ホストのピアIDを入力" style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 16px;">
                                     <button class="primary-btn" id="connect-peer-btn" style="padding: 12px 20px; white-space: nowrap;">接続</button>
                                 </div>
                                 <div style="margin-top: 10px;">
@@ -111,11 +111,11 @@
                                     <p style="margin-top: 10px; font-size: 0.9rem; color: #666;">QRコードをカメラに向けてください</p>
                                 </div>
                             </div>
-                            <p class="status-text" id="client-status" style="color: #666; font-style: italic;">質問者から教えてもらったピアIDを入力してください</p>
+                            <p class="status-text" id="client-status" style="color: #666; font-style: italic;">ホストから教えてもらったピアIDを入力してください</p>
                         </div>
                         
                         <div class="connection-instructions" style="text-align: center; margin: 20px 0; padding: 15px; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #4CAF50;">
-                            <p style="margin: 0; color: #2E7D32;">📱 質問者から教えてもらったピアIDを正確に入力してください</p>
+                            <p style="margin: 0; color: #2E7D32;">📱 ホストから教えてもらったピアIDを正確に入力してください</p>
                         </div>
                         
                         <div class="button-container" style="text-align: center; margin-top: 30px;">
@@ -341,7 +341,7 @@
     <!-- QRコード読み取りライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     
-    <script src="p2p-utils.js?v=2.4.13"></script>
-    <script src="app.js?v=2.4.13"></script>
+    <script src="p2p-utils.js?v=2.4.14"></script>
+    <script src="app.js?v=2.4.14"></script>
 </body>
 </html>

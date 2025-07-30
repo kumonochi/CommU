@@ -739,9 +739,16 @@ class CommUApp {
         
         document.body.appendChild(popup);
         
+        // 2秒後にフェードアウト開始
         setTimeout(() => {
-            popup.remove();
-        }, 3000);
+            popup.style.opacity = '0';
+            popup.style.transition = 'opacity 0.5s ease-out';
+            
+            // フェードアウト完了後に削除
+            setTimeout(() => {
+                popup.remove();
+            }, 500);
+        }, 2000);
     }
 
     // デバッグ用ログ表示機能
@@ -879,9 +886,9 @@ class CommUApp {
                 this.roomParticipants[data.roomId].participantCount--;
                 if (this.currentRole === 'answerer' && this.currentRoom === data.roomId) {
                     this.showMessage('質問者が退出しました。接続画面に戻ります。');
-                    // 回答者も強制的に退出
+                    // 回答者はP2P接続を維持したまままルームのみ退出
                     setTimeout(() => {
-                        this.disconnectAndReturnToTitle();
+                        this.exitRoomOnly();
                     }, 2000);
                 }
             } else if (data.role === 'answerer') {
@@ -1091,6 +1098,20 @@ class CommUApp {
         }
     }
 
+    // ルームのみ退出（P2P接続は維持）
+    exitRoomOnly() {
+        this.showDebugLog('info', 'ルームのみ退出（P2P接続は維持）');
+        
+        // ルーム状態のみリセット
+        this.currentRole = null;
+        this.currentRoom = null;
+        this.chatHistory = [];
+        
+        // 接続画面に戻る
+        this.showScreen('connection-screen');
+        this.enableConnectionButtons();
+    }
+    
     // 接続解除してタイトルに戻る
     disconnectAndReturnToTitle() {
         this.showDebugLog('info', 'P2P接続を解除してタイトルに戻る');
