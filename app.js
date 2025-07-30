@@ -213,6 +213,11 @@ class CommUApp {
         // ピアIDをルームIDとして使用
         this.currentRoom = peerId;
         
+        // チャット履歴をクリア（新規開始時は常にクリア）
+        this.chatHistory = [];
+        this.roomChatHistory[peerId] = [];
+        this.updateChatHistoryDisplay();
+        
         // ルーム参加者を初期化（質問者として登録）
         this.roomParticipants[peerId] = {
             questioner: { deviceId: 'host', connected: true },
@@ -237,6 +242,11 @@ class CommUApp {
         // 接続先のピアIDをルームIDとして使用
         const peerId = this.p2pManager.connection.peer;
         this.currentRoom = peerId;
+        
+        // チャット履歴をクリア（新規接続時は常にクリア）
+        this.chatHistory = [];
+        this.roomChatHistory[peerId] = [];
+        this.updateChatHistoryDisplay();
         
         // ルーム参加者情報を更新
         this.roomParticipants[peerId] = {
@@ -298,6 +308,22 @@ class CommUApp {
         };
 
         this.addToChatHistory('questioner', questionText);
+        
+        // 質問者側でもアニメーションを適用
+        if (animation && animation !== 'none') {
+            const chatHistory = document.getElementById('chat-history');
+            const lastChatItem = chatHistory.lastElementChild;
+            if (lastChatItem) {
+                const textSpan = lastChatItem.querySelector('span');
+                if (textSpan) {
+                    textSpan.className = `animation-${animation}`;
+                    setTimeout(() => {
+                        textSpan.className = '';
+                    }, 2000);
+                }
+            }
+        }
+        
         document.getElementById('question-input').value = '';
 
         // 統合メッセージ送信
@@ -316,6 +342,9 @@ class CommUApp {
         
         // 回答ボタンを有効化
         this.enableAnswerButtons();
+        
+        // 質問中はメッセージ送信機能を無効化
+        this.disableMessageSending();
         
         // アニメーション適用
         if (questionData.animation && questionData.animation !== 'none') {
@@ -1117,6 +1146,21 @@ class CommUApp {
         if (messageInput) {
             messageInput.disabled = false;
             messageInput.style.opacity = '1';
+        }
+    }
+    
+    // メッセージ送信を無効化
+    disableMessageSending() {
+        const messageBtn = document.getElementById('send-message-btn');
+        const messageInput = document.getElementById('free-message-input');
+        
+        if (messageBtn) {
+            messageBtn.disabled = true;
+            messageBtn.style.opacity = '0.5';
+        }
+        if (messageInput) {
+            messageInput.disabled = true;
+            messageInput.style.opacity = '0.5';
         }
     }
     
