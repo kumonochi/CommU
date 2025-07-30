@@ -1107,9 +1107,8 @@ class CommUApp {
         this.currentRoom = null;
         this.chatHistory = [];
         
-        // 接続画面に戻る
-        this.showScreen('connection-screen');
-        this.enableConnectionButtons();
+        // 役割選択画面に戻る
+        this.showScreen('role-screen');
     }
     
     // 接続解除してタイトルに戻る
