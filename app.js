@@ -536,7 +536,32 @@ class CommUApp {
         if (isVoiceSynthesis) {
             this.speakText(answerType);
         } else {
-            this.playSoundEffect(answerType);
+            // 指定されたMP3ファイルを再生
+            this.playMP3ByAnswerType(answerType);
+        }
+    }
+
+    playMP3ByAnswerType(answerType) {
+        const soundFiles = {
+            'yes': 'SE/食べ物をパクッ.mp3',
+            'no': 'SE/しょげる.mp3', 
+            'maybe': 'SE/涙のしずく.mp3',
+            'refuse': 'SE/鈴を鳴らす.mp3'
+        };
+
+        const soundFile = soundFiles[answerType];
+        if (soundFile) {
+            try {
+                const audio = new Audio(soundFile);
+                audio.volume = 0.7; // 音量を調整
+                audio.play().catch(error => {
+                    console.warn('音声再生エラー:', error);
+                    this.showDebugLog('warn', `音声再生失敗: ${soundFile}`, error);
+                });
+            } catch (error) {
+                console.error('音声ファイル読み込みエラー:', error);
+                this.showDebugLog('error', `音声ファイル読み込み失敗: ${soundFile}`, error);
+            }
         }
     }
 
